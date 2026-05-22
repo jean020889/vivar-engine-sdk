@@ -1,38 +1,59 @@
-# Vivar Engine SDK - Sistema y Motor de Cifrado Híbrido v9.9.5
-### Blindaje Criptográfico Post-Cuántico y Esteganografía Avanzada para Aplicaciones B2B
+# Vivar Engine SDK - Hybrid Cryptographic Framework v9.9.5
+### Post-Quantum Cryptographic Shield & Advanced Stochastic Steganography for Enterprise B2B Architectures
 
-Bienvenido al SDK oficial de **Vivar Engine**, un motor criptográfico de alto rendimiento diseñado en una arquitectura híbrida (Rust Core + Python Wrapper). Este componente permite a empresas de desarrollo de software integrar esquemas de protección de datos de grado militar y esteganografía estocástica en ERPs, sistemas contables, plataformas médicas y pasarelas de pago, sin necesidad de programar lógica criptográfica desde cero.
-
----
-
-## 1. Cualidades Técnicas Principales
-* **Núcleo de Estado Mutante Encadenado:** Implementado en Rust con optimizaciones de bajo nivel para mutar bloques de datos dinámicamente mediante operaciones a nivel de bits $\pmod 8$ y XOR.
-* **KDF Ultra-Reforzado Post-Cuántico:** Derivación de claves basada en PBKDF2-HMAC-SHA512 con 1,200,000 iteraciones, diseñada para resistir ataques de fuerza bruta acelerados por hardware y algoritmos cuánticos (Grover).
-* **Ocultamiento Esteganográfico:** Inyección de archivos confidenciales dentro de estructuras binarias de archivos portadores legítimos, aplicando una capa balanceada de ruido estocástico para neutralizar el análisis forense de entropía.
+Welcome to the official International SDK for the **Vivar Engine**, a high-performance cryptographic framework engineered on a robust hybrid architecture (Rust Native Core + Python Wrapper). This SDK enables enterprise software development firms and global SaaS providers to instantly inject military-grade data protection and stochastic steganographic masking into corporate ERPs, accounting systems, medical databases, and Fintech payment pipelines without developing complex cryptographic protocols from scratch.
 
 ---
 
-## 2. Requisitos del Entorno
-El entorno de ejecución del cliente final o del servidor debe contar con:
-* **Python 3.8 o superior** (con librerías estándar: `ctypes`, `hashlib`, `json`, `secrets`).
-* **Compilador de Rust (rustc)** instalado en el sistema operativo para el enlace dinámico automático de la librería de núcleo (`.so` / `.dll`).
+## 1. Core Technical Properties
+* **Chained Mutant State Engine:** Implemented in low-level optimized Rust, executing dynamic bitwise block mutations $\pmod 8$ and complex XOR permutations to eliminate predictable binary signatures and resist statistical cryptanalysis.
+* **Post-Quantum Key Derivation Function (KDF):** Built upon PBKDF2-HMAC-SHA512 running an ultra-reinforced layer of 1,200,000 hashing iterations. Explicitly designed to neutralize brute-force hardware attacks and post-quantum algebraic cryptanalysis (Grover's Algorithm).
+* **Stochastic Steganographic Injection:** Injects encrypted target payloads directly into legitimate carrier file structures (e.g., standard digital images or document containers) using an analytical stochastic noise distribution array to completely deceive structural entropy forensic scanners.
 
 ---
 
-## 3. Guía de Integración Rápida (Ejemplo de Uso)
+## 2. Commercial Licensing & Global Tier Pricing
+Use of this SDK requires an active commercial enterprise license managed by **Tecnosoluciones**. In order to maintain optimal fiscal compliance and cover international banking/wire frictions, licensing is structured into the following operational tiers:
 
-Integrar el Operador de Vivar en su flujo de software es sumamente sencillo. El hilo principal del SDK automatiza la compilación nativa en nivel de optimización máxima (`opt-level=3`).
+### Developer & Startup Tier
+* **Target:** Independent software developers and early-stage startups.
+* **Pricing:** **$499.00 USD / Month** * **Billing Cycle:** Billed Tri-Annually ($1,497.00 USD every 4 months) to optimize international wire transfer processing.
 
-### Inicialización y Llamada al Motor
+### Mid-Market Enterprise Tier (Recommended)
+* **Target:** Established software houses managing corporate ERPs, medical software (HIPAA compliant), or regional FinTech platforms.
+* **Pricing:** **$1,200.00 USD / Month**
+* **Billing Cycle:** Billed Bi-Annually ($7,200.00 USD every 6 months). Includes priority repository access and compliance documentation support.
+
+### Infrastructure & Critical Enterprise Tier
+* **Target:** Banking institutions, high-volume payment gateways, and government-grade data systems requiring bespoke implementations.
+* **Pricing:** **$3,500.00 USD / Month** (or custom flat fee implementations starting at $25,000.00 USD).
+* **Billing Cycle:** Billed Annually ($42,000.00 USD). Includes direct architectural engineering support.
+
+> **International Wire Transfer Policy:** Pursuant to Ecuadorian fiscal regulations (SRI) and correspondent banking fees, all international SWIFT/wire transfer fees, intermediary banking commissions, and local originating taxes must be fully covered by the ordering licensee. Net contract values must arrive intact at our corporate receiving accounts.
+
+---
+
+## 3. Environment Requirements
+The host environment or production server requires the following baseline stack:
+* **Python 3.8 or higher** (utilizing native system standard libraries: `ctypes`, `hashlib`, `json`, `secrets`).
+* **Rust Compiler (rustc)** installed on the host operating system to facilitate the transparent compilation and dynamic linking of the core binary library (`.so` / `.dll`).
+
+---
+
+## 4. Quick Integration Guide (Implementation Example)
+
+Integrating the Vivar Operator into your software infrastructure is streamlined. The SDK orchestrates the automated compilation of the native Rust core under maximum machine code optimization (`-C opt-level=3`).
+
+### Initializing and Executing the Engine
 
 ```python
 import ipywidgets as widgets
-# Asegúrese de incluir el archivo 'vivar_engine.py' en el directorio de su aplicación
+# Ensure 'vivar_engine.py' is placed within your application's execution root directory
 
-# 1. Definir los parámetros en su código de fondo:
-master_key = "SU_LLAVE_MAESTRA_DE_ALTA_ENTROPIA"
-modo = "PROTECT (Cifrar)" # O "RECOVER (Descifrar)"
+# 1. Define configuration states within your application backend:
+master_key = "YOUR_HIGH_ENTROPY_SECURE_MASTER_KEY"
+execution_mode = "PROTECT (Cifrar)" # Alternates with "RECOVER (Descifrar)"
 
-# 2. El SDK ejecutará el aislamiento en Rust de forma transparente:
-# - En modo PROTECT: Solicitará el archivo sensible y el archivo portador.
-# - En modo RECOVER: Extraerá el binario original decodificando los metadatos.
+# 2. The SDK handles isolated low-level memory allocation transparently:
+# - In PROTECT Mode: Prompts for the sensitive file payload and the legitimate carrier.
+# - In RECOVER Mode: Extracts the original binary by decoding the cryptographic metadata.
