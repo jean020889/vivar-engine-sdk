@@ -1,0 +1,35 @@
+COMMERCIAL SOFTWARE LICENSE AND PROPRIETARY AGREEMENT
+PRODUCT: VIVAR ENGINE HYBRID CRYPTOGRAPHIC SDK (v9.9.5)
+AUTHOR AND RIGHTS HOLDER: JEAN CARLOS VIVAR BENÍTEZ
+OPERATING ENTITY: TECNOSOLUCIONES (HUAQUILLAS, EL ORO, ECUADOR)
+
+IMPORTANT—READ CAREFULLY: This Commercial Software License Agreement ("Agreement") is a legally binding contract between you (either an individual developer or a single corporate entity, hereinafter "Licensee") and Jean Carlos Vivar Benítez ("Author"), regarding the use of the Vivar Engine Hybrid Cryptographic SDK, including its native Rust core, Python wrapper components, documentation, and associated binary objects (collectively, the "Software").
+
+By installing, copying, embedding, or otherwise utilizing the Software, Licensee agrees to be bound strictly by the terms of this Agreement. If you do not agree, do not install or use the Software.
+
+1. INTELLECTUAL PROPERTY AND OWNERSHIP
+The Software, including but not limited to its source code, structural logic, mathematical state engine, bitwise block mutation algorithms, and stochastic steganographic methodologies, is the exclusive proprietary intellectual property of Jean Carlos Vivar Benítez. The Software is officially registered and protected by the Servicio Nacional de Derechos Intelectuales (SENADI) of the Republic of Ecuador under Application/Filing Number SENADI-2026-44647, and is globally protected under the Berne Convention for the Protection of Literary and Artistic Works, international copyright treaties, and all other applicable intellectual property laws.
+
+2. GRANT OF LICENSE
+Subject to timely subscription payments and full compliance with this Agreement, the Author grants Licensee a limited, non-exclusive, non-transferable, revocable, month-to-month commercial license to integrate the compiled binary components of the Software strictly as an embedded dependency within Licensee's proprietary commercial software applications.
+
+3. RESTRICTIONS ON USE
+Licensee explicitly agrees NOT to, and shall not permit any third party to:
+a) Decompile, disassemble, decrypt, extract, or attempt to derive or reverse-engineer the underlying mathematical logic of the Vivar Operator Engine contained within the pre-compiled Rust binary layer.
+b) Separate, slice, or isolate the Python wrapper or the Rust core to distribute them as standalone software components or independent cryptographic products.
+c) Sell, sub-license, rent, lease, or redistribute the source code of this SDK to any third-party development firm or public repository.
+d) Bypass, modify, or disable any automated license key validation or remote token verification mechanisms embedded within the SDK interface.
+
+4. COMMERCIAL FEES AND INTERNATIONAL WIRE TRANSFER POLICY
+The commercial right to operate and call upon this SDK is contingent upon the payment of the active tier fee (Developer Tier at $499.00 USD/Month billed tri-annually, Mid-Market Tier at $1,200.00 USD/Month billed bi-annually, or Infrastructure Tier at $3,500.00 USD/Month billed annually).
+Pursuant to corporate operations and international tax structures (SRI compliance):
+a) All international SWIFT/wire transfer processing fees, intermediary or correspondent banking commissions, and country-of-origin withholding taxes must be fully covered and assumed by the Licensee.
+b) Net contract values must arrive fully intact at the Author's corporate receiving accounts in Ecuador. Any payment received short of the full invoice amount due to banking friction will result in immediate suspension of license validity.
+
+5. TERMINATION
+This Agreement automatically renews on a month-to-month basis upon successful clearance of the scheduled tier subscription billing. Failure to clear fees or any breach of the technical restrictions outlined in Section 3 shall result in immediate, automatic termination of this license. Upon termination, Licensee must immediately cease all commercial exploitation of the cryptographic module, remove the SDK from production environments, and destroy all copies of the source code in their possession. The Author reserves the right to initiate international litigation and claim statutory damages under global intellectual property frameworks.
+
+6. GOVERNING LAW AND JURISDICTION
+This Agreement shall be governed by, interpreted, and construed in accordance with the laws of the Republic of Ecuador and international copyright conventions. Any legal dispute, claim, or controversy arising out of or relating to this license shall be subject to the exclusive jurisdiction of the competent courts of the Province of El Oro, Ecuador.
+
+Copyright (c) 2026 Jean Carlos Vivar Benítez / Tecnosoluciones. All Rights Reserved.
