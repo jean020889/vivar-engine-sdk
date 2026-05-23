@@ -24,3 +24,5 @@ opt-level = 3      # Máxima optimización de velocidad
 lto = true         # Link Time Optimization (binario más pequeño y rápido)
 codegen-units = 1  # Compilación más lenta para generar el código más optimizado posible
 panic = "abort"    # Reduce significativamente el tamaño del binario eliminando el stack unwinding
+strip = true  # <--- Añade esto para un binario más compacto
+
