@@ -2,6 +2,11 @@
 
 use std::slice;
 use zeroize::Zeroize;
+use pqcrypto_kyber::kyber768::{encapsulate, keypair, PublicKey, Ciphertext, SharedSecret};
+use pqcrypto_traits::kem::PublicKey as PkTrait;
+use pqcrypto_traits::kem::SecretKey as SkTrait;
+use pqcrypto_traits::kem::Ciphertext as CtTrait;
+use pqcrypto_traits::kem::SharedSecret as SsTrait;
 
 #[repr(C)]
 pub struct VivarBuffer {
@@ -9,15 +14,13 @@ pub struct VivarBuffer {
     pub len: usize,
 }
 
-/// Motor de Cifrado Vivar (VCE) - Versión Final
-/// Utiliza encadenamiento CBC para asegurar la difusión de datos.
-/// is_encrypt: 1 para Cifrar, 0 para Descifrar.
+/// Motor de Cifrado Vivar: Algoritmo de difusión con realimentación (VCE)
 #[no_mangle]
 pub extern "C" fn vivar_crypt_engine(
     buffer: *mut VivarBuffer,
     key_ptr: *mut u8,
     key_len: usize,
-    is_encrypt: u8 
+    is_encrypt: u8
 ) -> i32 {
     if buffer.is_null() || key_ptr.is_null() { return 1; }
     
@@ -44,6 +47,32 @@ pub extern "C" fn vivar_crypt_engine(
             }
         }
         key_slice.zeroize();
+    }
+    0
+}
+
+/// Generación de claves seguras: FIPS 203 (Kyber768)
+#[no_mangle]
+pub extern "C" fn generate_pqc_keys(pk_out: *mut u8, sk_out: *mut u8) -> i32 {
+    let (pk, sk) = keypair();
+    unsafe {
+        std::ptr::copy_nonoverlapping(PkTrait::as_bytes(&pk).as_ptr(), pk_out, 1184);
+        std::ptr::copy_nonoverlapping(SkTrait::as_bytes(&sk).as_ptr(), sk_out, 2400);
+    }
+    0
+}
+
+/// Encapsulación de clave simétrica para proteger el canal
+#[no_mangle]
+pub extern "C" fn perform_kem_encapsulation(pk_in: *const u8, ct_out: *mut u8, ss_out: *mut u8) -> i32 {
+    unsafe {
+        let pk = match PublicKey::from_bytes(slice::from_raw_parts(pk_in, 1184)) {
+            Ok(k) => k,
+            Err(_) => return 2,
+        };
+        let (ss, ct) = encapsulate(&pk);
+        std::ptr::copy_nonoverlapping(CtTrait::as_bytes(&ct).as_ptr(), ct_out, 1088);
+        std::ptr::copy_nonoverlapping(SsTrait::as_bytes(&ss).as_ptr(), ss_out, 32);
     }
     0
 }
