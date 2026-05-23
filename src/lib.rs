@@ -1,14 +1,12 @@
-use pqcrypto_kyber::kyber512::{keypair, PublicKey, SecretKey};
-use pqcrypto_traits::kem::PublicKey as _;
-use pqcrypto_traits::kem::SecretKey as _;
+use pqcrypto_kyber::kyber512::{keypair};
 
 #[no_mangle]
 pub extern "C" fn generar_llaves_pqc() -> *mut (Vec<u8>, Vec<u8>) {
     let (pk, sk) = keypair();
     
-    // Convertimos a bytes usando los traits importados
-    let pk_vec = <PublicKey as pqcrypto_traits::kem::PublicKey>::as_bytes(&pk).to_vec();
-    let sk_vec = <SecretKey as pqcrypto_traits::kem::SecretKey>::as_bytes(&sk).to_vec();
+    // Convertimos directamente a Vec<u8> sin invocar métodos de traits conflictivos
+    let pk_vec = pk.to_bytes().to_vec();
+    let sk_vec = sk.to_bytes().to_vec();
     
     let resultado = Box::new((pk_vec, sk_vec));
     Box::into_raw(resultado)
