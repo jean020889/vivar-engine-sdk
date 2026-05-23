@@ -16,7 +16,6 @@ pub struct VivarBuffer {
 
 /// Motor de Cifrado Vivar: Algoritmo de difusión con realimentación (VCE)
 #[no_mangle]
-#[used] // Fuerza al compilador a mantener esta función aunque parezca no usada
 pub extern "C" fn vivar_crypt_engine(
     buffer: *mut VivarBuffer,
     key_ptr: *mut u8,
@@ -54,7 +53,6 @@ pub extern "C" fn vivar_crypt_engine(
 
 /// Generación de claves seguras: FIPS 203 (Kyber768)
 #[no_mangle]
-#[used]
 pub extern "C" fn generate_pqc_keys(pk_out: *mut u8, sk_out: *mut u8) -> i32 {
     let (pk, sk) = keypair();
     unsafe {
@@ -66,7 +64,6 @@ pub extern "C" fn generate_pqc_keys(pk_out: *mut u8, sk_out: *mut u8) -> i32 {
 
 /// Encapsulación de clave simétrica para proteger el canal
 #[no_mangle]
-#[used]
 pub extern "C" fn perform_kem_encapsulation(pk_in: *const u8, ct_out: *mut u8, ss_out: *mut u8) -> i32 {
     unsafe {
         let pk = match PublicKey::from_bytes(slice::from_raw_parts(pk_in, 1184)) {
