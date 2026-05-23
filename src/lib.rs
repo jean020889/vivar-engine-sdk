@@ -1,8 +1,8 @@
 use zeroize::Zeroize;
 use pqcrypto_kyber::kyber768::{
-    encapsulate, keypair, PublicKey, SecretKey
+    encapsulate, keypair, PublicKey
 };
-use pqcrypto_traits::kem::{PublicKey as _, SecretKey as _, Ciphertext as _, SharedSecret as _};
+use pqcrypto_traits::kem::{PublicKey as _, Ciphertext as _, SharedSecret as _};
 
 #[repr(C)]
 pub struct VivarBuffer {
@@ -12,6 +12,7 @@ pub struct VivarBuffer {
 
 /// Motor de mutación PQC: Procesa datos y realiza borrado seguro de memoria
 #[no_mangle]
+#[allow(unused_mut)]
 pub extern "C" fn vivar_operator_engine(
     buffer: *mut VivarBuffer,
     key_ptr: *mut u8,
