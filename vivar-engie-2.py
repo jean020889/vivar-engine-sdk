@@ -24,6 +24,18 @@ class VivarEngineSDK:
 
     def execute_mutation(self, data: bytearray, master_key: str):
         salt = secrets.token_bytes(16)
+
+        # En tu clase VivarEngineSDK:
+
+def prepare_quantum_safe_tunnel(self, remote_public_key: bytes):
+    """
+    Usa el KEM (Kyber768) para generar un secreto compartido.
+    Este secreto será la entrada para tu 'master_key' en el motor Vivar.
+    """
+    # Lógica de encapsulamiento que se comunica con el núcleo Rust
+    # Esto asegura que el intercambio de claves sea resistente a Shor.
+    pass
+    
         
         # 1. Derivación PQC (Argon2id)
         derived_key = self.derive_pqc_key(master_key, salt)
