@@ -2,7 +2,7 @@
 
 use std::slice;
 use zeroize::Zeroize;
-use pqcrypto_kyber::kyber768::{encapsulate, keypair, PublicKey, Ciphertext, SharedSecret};
+use pqcrypto_kyber::kyber768::{encapsulate, keypair, PublicKey};
 use pqcrypto_traits::kem::PublicKey as PkTrait;
 use pqcrypto_traits::kem::SecretKey as SkTrait;
 use pqcrypto_traits::kem::Ciphertext as CtTrait;
