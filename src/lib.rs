@@ -64,8 +64,8 @@ pub extern "C" fn perform_kem_encapsulation(
             Err(_) => return 2,
         };
         
-        // Declaración explícita de tipos para evitar errores de traits
-        let (ct, ss): (Ciphertext, SharedSecret) = encapsulate(&pk);
+        // CORRECCIÓN: El orden es (SharedSecret, Ciphertext) según la librería pqcrypto-kyber
+        let (ss, ct): (SharedSecret, Ciphertext) = encapsulate(&pk);
         
         // Uso de traits explícitos para acceder a as_bytes()
         std::ptr::copy_nonoverlapping(CtTrait::as_bytes(&ct).as_ptr(), ct_out, 1088);
