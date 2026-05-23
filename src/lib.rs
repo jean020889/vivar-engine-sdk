@@ -1,16 +1,16 @@
-use pqcrypto_kyber::kyber512::{keypair, PublicKey, SecretKey};
-use pqcrypto_traits::kem::PublicKey as KyberPublicKey;
-use pqcrypto_traits::kem::SecretKey as KyberSecretKey;
+use pqcrypto_kyber::kyber512::{keypair};
+use pqcrypto_traits::kem::{PublicKey, SecretKey};
 
 #[no_mangle]
 pub extern "C" fn generar_llaves_pqc() -> *mut (Vec<u8>, Vec<u8>) {
     let (pk, sk) = keypair();
     
-    // Aquí invocamos el método de forma absoluta desde el trait importado
-    let pk_bytes = KyberPublicKey::as_bytes(&pk).to_vec();
-    let sk_bytes = KyberSecretKey::as_bytes(&sk).to_vec();
+    // Accedemos a los bytes convirtiendo directamente el struct 
+    // usando la implementación del trait que ya está vinculada al tipo.
+    let pk_vec = pk.as_bytes().to_vec();
+    let sk_vec = sk.as_bytes().to_vec();
     
-    let resultado = Box::new((pk_bytes, sk_bytes));
+    let resultado = Box::new((pk_vec, sk_vec));
     Box::into_raw(resultado)
 }
 
