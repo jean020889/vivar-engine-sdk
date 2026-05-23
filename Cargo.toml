@@ -4,25 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "staticlib"] # Añadimos staticlib para mayor compatibilidad
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
 
 [dependencies]
-# Criptografía Post-Cuántica (Estándar NIST - Kyber768)
+zeroize = { version = "1.8", features = ["derive"] }
 pqcrypto-kyber = "0.7"
 pqcrypto-traits = "0.3"
-
-# Gestión segura de memoria (Borrado de secretos en RAM)
-zeroize = { version = "1.7", features = ["derive"] }
-
-# Utilidades de hashing y derivación (Para expansión de secretos si es necesario)
 hkdf = "0.12"
-sha3 = "0.10"
-
-# Optimizaciones de rendimiento para producción
-[profile.release]
-opt-level = 3      # Máxima optimización de velocidad
-lto = true         # Link Time Optimization (binario más pequeño y rápido)
-codegen-units = 1  # Compilación más lenta para generar el código más optimizado posible
-panic = "abort"    # Reduce significativamente el tamaño del binario eliminando el stack unwinding
-strip = true  # <--- Añade esto para un binario más compacto
-
+sha2 = "0.10"
