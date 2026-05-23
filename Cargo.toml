@@ -14,3 +14,8 @@ pqcrypto-traits = "0.3"
 hkdf = "0.12"
 sha3 = "0.10"
 
+[dependencies]
+pqcrypto-kyber = "0.7"
+pqcrypto-traits = "0.3"
+zeroize = { version = "1.7", features = ["derive"] }
+
