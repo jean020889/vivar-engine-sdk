@@ -7,6 +7,8 @@ use pqcrypto_traits::kem::PublicKey as PkTrait;
 use pqcrypto_traits::kem::SecretKey as SkTrait;
 use pqcrypto_traits::kem::Ciphertext as CtTrait;
 use pqcrypto_traits::kem::SharedSecret as SsTrait;
+use hkdf::Hkdf;
+use sha2::Sha256;
 
 #[repr(C)]
 pub struct VivarBuffer {
@@ -15,6 +17,7 @@ pub struct VivarBuffer {
 }
 
 /// Motor de Cifrado Vivar: Algoritmo de difusión con realimentación (VCE)
+/// Nivel corporativo: Utiliza realimentación compleja para streaming de baja latencia.
 #[no_mangle]
 pub extern "C" fn vivar_crypt_engine(
     buffer: *mut VivarBuffer,
@@ -46,6 +49,7 @@ pub extern "C" fn vivar_crypt_engine(
                 feedback = val;
             }
         }
+        // Borrado seguro de la clave de la RAM tras su uso
         key_slice.zeroize();
     }
     0
@@ -62,17 +66,34 @@ pub extern "C" fn generate_pqc_keys(pk_out: *mut u8, sk_out: *mut u8) -> i32 {
     0
 }
 
-/// Encapsulación de clave simétrica para proteger el canal
+/// Encapsulación de clave con derivación HKDF (Nivel Corporativo)
+/// Garantiza que cada sesión de cifrado sea única, incluso con la misma clave pública.
 #[no_mangle]
-pub extern "C" fn perform_kem_encapsulation(pk_in: *const u8, ct_out: *mut u8, ss_out: *mut u8) -> i32 {
+pub extern "C" fn perform_kem_encapsulation(
+    pk_in: *const u8, 
+    ct_out: *mut u8, 
+    ss_out: *mut u8,
+    salt: *const u8, 
+    salt_len: usize
+) -> i32 {
     unsafe {
         let pk = match PublicKey::from_bytes(slice::from_raw_parts(pk_in, 1184)) {
             Ok(k) => k,
             Err(_) => return 2,
         };
         let (ss, ct) = encapsulate(&pk);
+        
+        // Derivación de clave robusta usando HKDF-SHA256
+        let salt_slice = slice::from_raw_parts(salt, salt_len);
+        let hk = Hkdf::<Sha256>::new(Some(salt_slice), ss.as_bytes());
+        
+        let mut okm = [0u8; 32];
+        if hk.expand(b"vivar-encryption-session", &mut okm).is_err() {
+            return 3;
+        }
+        
         std::ptr::copy_nonoverlapping(CtTrait::as_bytes(&ct).as_ptr(), ct_out, 1088);
-        std::ptr::copy_nonoverlapping(SsTrait::as_bytes(&ss).as_ptr(), ss_out, 32);
+        std::ptr::copy_nonoverlapping(okm.as_ptr(), ss_out, 32);
     }
     0
 }
