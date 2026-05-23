@@ -17,3 +17,9 @@ zeroize = { version = "1.7", features = ["derive"] }
 # Utilidades de hashing y derivación
 hkdf = "0.12"
 sha3 = "0.10"
+
+[profile.release]
+opt-level = 3      # Máxima optimización de velocidad
+lto = true         # Link Time Optimization (reduce el tamaño y mejora velocidad)
+codegen-units = 1  # Tiempo de compilación más largo, pero código más optimizado
+panic = "abort"    # Reduce tamaño binario al eliminar desenrollado de pila
