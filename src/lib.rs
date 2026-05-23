@@ -1,13 +1,14 @@
-use pqcrypto_kyber::kyber512::{keypair};
-use pqcrypto_traits::kem::{PublicKey, SecretKey};
+use pqcrypto_kyber::kyber512::{keypair, PublicKey, SecretKey};
+use pqcrypto_traits::kem::{PublicKey as PublicKeyTrait, SecretKey as SecretKeyTrait};
 
 #[no_mangle]
 pub extern "C" fn generar_llaves_pqc() -> *mut (Vec<u8>, Vec<u8>) {
     let (pk, sk) = keypair();
     
-    // Accedemos directamente a los bytes sin pasar por métodos complejos de traits
-    let pk_bytes = pk.as_bytes().to_vec();
-    let sk_bytes = sk.as_bytes().to_vec();
+    // La forma correcta de invocar el método de un trait en Rust
+    // es usar el trait como espacio de nombres sobre la instancia.
+    let pk_bytes = PublicKeyTrait::as_bytes(&pk).to_vec();
+    let sk_bytes = SecretKeyTrait::as_bytes(&sk).to_vec();
     
     let resultado = Box::new((pk_bytes, sk_bytes));
     Box::into_raw(resultado)
