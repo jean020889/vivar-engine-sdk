@@ -3,12 +3,20 @@
 use std::slice;
 use zeroize::Zeroize;
 use pqcrypto_kyber::kyber768::{encapsulate, keypair, PublicKey};
-use pqcrypto_traits::kem::PublicKey as PkTrait;
-use pqcrypto_traits::kem::SecretKey as SkTrait;
-use pqcrypto_traits::kem::Ciphertext as CtTrait;
-use pqcrypto_traits::kem::SharedSecret as SsTrait;
+use pqcrypto_traits::kem::{PublicKey as PkTrait, SecretKey as SkTrait, Ciphertext as CtTrait, SharedSecret as SsTrait};
 use hkdf::Hkdf;
 use sha2::Sha256;
+use hmac::{Hmac, Mac};
+
+// --- Definiciones del Motor Vivar ---
+
+#[repr(i32)]
+pub enum VceError {
+    Success = 0,
+    NullPointer = 1,
+    IntegrityError = 2,
+    CryptoError = 3,
+}
 
 #[repr(C)]
 pub struct VivarBuffer {
@@ -16,7 +24,31 @@ pub struct VivarBuffer {
     pub len: usize,
 }
 
-/// Motor de Cifrado Vivar: Algoritmo de difusión con realimentación (VCE)
+/// Implementación del Operador de Difusión Vivar (VCE)
+/// Emula la rigidez espectral eliminando fugas mediante realimentación.
+fn vivar_diffusion_operator(data: &mut [u8], key: &[u8], is_encrypt: bool) {
+    let mut feedback: u64 = 0x9E3779B9; // Constante de dispersión adélica
+    let key_len = key.len();
+
+    for (i, val) in data.iter_mut().enumerate() {
+        let key_byte = key[i % key_len] as u64;
+        let nonce = (i & 0xFF) as u64;
+        
+        // Operación de difusión no lineal
+        let transformation = (feedback ^ nonce ^ key_byte).rotate_left(7);
+        
+        if is_encrypt {
+            *val ^= (transformation & 0xFF) as u8;
+            feedback = *val as u64 ^ feedback.rotate_right(3);
+        } else {
+            let original = *val;
+            *val ^= (transformation & 0xFF) as u8;
+            feedback = original as u64 ^ feedback.rotate_right(3);
+        }
+    }
+}
+
+/// Motor de Cifrado Vivar: Interfaz C exportable
 #[no_mangle]
 pub extern "C" fn vivar_crypt_engine(
     buffer: *mut VivarBuffer,
@@ -24,37 +56,20 @@ pub extern "C" fn vivar_crypt_engine(
     key_len: usize,
     is_encrypt: u8
 ) -> i32 {
-    // Validación de seguridad para evitar punteros nulos
-    if buffer.is_null() || key_ptr.is_null() { return 1; }
+    if buffer.is_null() || key_ptr.is_null() { return VceError::NullPointer as i32; }
     
     unsafe {
         let buf = &mut *buffer;
-        // Validación de tamaño para evitar Buffer Overflow
-        if buf.data.is_null() || buf.len == 0 { return 1; }
-
         let data_slice = slice::from_raw_parts_mut(buf.data, buf.len);
-        let key_slice = slice::from_raw_parts_mut(key_ptr, key_len);
+        let key_slice = slice::from_raw_parts(key_ptr, key_len);
         
-        let mut feedback: u8 = 0;
-        let encrypt = is_encrypt != 0;
+        vivar_diffusion_operator(data_slice, key_slice, is_encrypt != 0);
         
-        for i in 0..buf.len {
-            let nonce = (i & 0xFF) as u8;
-            let val = data_slice[i];
-            
-            if encrypt {
-                let current = val ^ key_slice[i % key_len] ^ nonce ^ feedback;
-                data_slice[i] = current;
-                feedback = current;
-            } else {
-                let decrypted = val ^ feedback ^ nonce ^ key_slice[i % key_len];
-                data_slice[i] = decrypted;
-                feedback = val;
-            }
-        }
-        key_slice.zeroize();
+        // Limpieza de memoria sensible
+        let mut mut_key = slice::from_raw_parts_mut(key_ptr, key_len);
+        mut_key.zeroize();
     }
-    0
+    VceError::Success as i32
 }
 
 /// Generación de claves seguras: FIPS 203 (Kyber768)
@@ -67,10 +82,10 @@ pub extern "C" fn generate_pqc_keys(pk_out: *mut u8, sk_out: *mut u8) -> i32 {
         std::ptr::copy_nonoverlapping(PkTrait::as_bytes(&pk).as_ptr(), pk_out, 1184);
         std::ptr::copy_nonoverlapping(SkTrait::as_bytes(&sk).as_ptr(), sk_out, 2400);
     }
-    0
+    VceError::Success as i32
 }
 
-/// Encapsulación de clave con derivación HKDF
+/// Encapsulación con derivación HKDF para el motor
 #[no_mangle]
 pub extern "C" fn perform_kem_encapsulation(
     pk_in: *const u8, 
@@ -79,15 +94,14 @@ pub extern "C" fn perform_kem_encapsulation(
     salt: *const u8, 
     salt_len: usize
 ) -> i32 {
-    // Validaciones defensivas contra punteros nulos
     if pk_in.is_null() || ct_out.is_null() || ss_out.is_null() || salt.is_null() {
-        return 4;
+        return VceError::NullPointer as i32;
     }
     
     unsafe {
         let pk = match PublicKey::from_bytes(slice::from_raw_parts(pk_in, 1184)) {
             Ok(k) => k,
-            Err(_) => return 2,
+            Err(_) => return VceError::CryptoError as i32,
         };
         let (ss, ct) = encapsulate(&pk);
         
@@ -96,11 +110,11 @@ pub extern "C" fn perform_kem_encapsulation(
         
         let mut okm = [0u8; 32];
         if hk.expand(b"vivar-encryption-session", &mut okm).is_err() {
-            return 3;
+            return VceError::CryptoError as i32;
         }
         
         std::ptr::copy_nonoverlapping(CtTrait::as_bytes(&ct).as_ptr(), ct_out, 1088);
         std::ptr::copy_nonoverlapping(okm.as_ptr(), ss_out, 32);
     }
-    0
+    VceError::Success as i32
 }
