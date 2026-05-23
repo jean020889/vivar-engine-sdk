@@ -1,35 +1,32 @@
+import os
 from flask import Flask, request, send_file, jsonify
 from vivar_sdk import VivarEngineSDK
 import io
 
 app = Flask(__name__)
-# Inicializa el SDK (ajusta el path si es necesario)
 sdk = VivarEngineSDK()
 
+# Ruta para servir la interfaz web
 @app.route('/')
 def index():
-    return send_file('web/index.html')
+    return send_file(os.path.join('web', 'index.html'))
     
 @app.route('/cifrar', methods=['POST'])
 def cifrar():
+    # Asegúrate de que tu interfaz envíe el archivo bajo la key 'archivo'
     if 'archivo' not in request.files:
-        return jsonify({"error": "No se envió archivo"}), 400
+        return jsonify({"error": "No se recibió archivo"}), 400
     
     archivo = request.files['archivo']
-    clave = request.form.get('clave', '').encode() # La clave debe ser bytes
-    
-    # 1. Leer los bytes puros sin procesar
-    datos_binarios = archivo.read()
+    clave = request.form.get('clave', '').encode()
     
     try:
-        # 2. Mutación segura mediante el SDK
-        # Nota: Aquí asumo que ya tienes una clave o secreto derivado
+        datos_binarios = archivo.read()
         resultado = sdk.execute_mutation(datos_binarios, clave)
         
-        # 3. Crear el flujo para la descarga
         buffer_salida = io.BytesIO(resultado)
         
-        # 4. Enviar como archivo binario puro para evitar corrupción
+        # Preservamos el nombre original para evitar sospechas
         return send_file(
             buffer_salida,
             mimetype='application/octet-stream',
@@ -41,5 +38,3 @@ def cifrar():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-    
-  
