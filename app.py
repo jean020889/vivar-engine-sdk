@@ -6,6 +6,10 @@ app = Flask(__name__)
 # Inicializa el SDK (ajusta el path si es necesario)
 sdk = VivarEngineSDK()
 
+@app.route('/')
+def index():
+    return send_file('web/index.html')
+    
 @app.route('/cifrar', methods=['POST'])
 def cifrar():
     if 'archivo' not in request.files:
@@ -37,4 +41,5 @@ def cifrar():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+    
   
