@@ -1,5 +1,5 @@
 [package]
-name = "vivar-engine-sdk"
+name = "core"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,15 +7,13 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-# Librería de algoritmos post-cuánticos del NIST
-pqcrypto-kyber = "0.7" 
-pqcrypto-traits = "0.3"
-# Para derivación segura (si se requiere post-KEM)
-hkdf = "0.12"
-sha3 = "0.10"
-
-[dependencies]
+# Criptografía Post-Cuántica (NIST Standard)
 pqcrypto-kyber = "0.7"
 pqcrypto-traits = "0.3"
+
+# Gestión segura de memoria (Borrado post-operación)
 zeroize = { version = "1.7", features = ["derive"] }
 
+# Utilidades de hashing y derivación
+hkdf = "0.12"
+sha3 = "0.10"
