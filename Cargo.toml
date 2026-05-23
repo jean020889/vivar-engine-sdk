@@ -7,5 +7,10 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-pqcrypto-kyber = "0.8.0"
-pqcrypto-traits = "0.3.5"
+# Librería de algoritmos post-cuánticos del NIST
+pqcrypto-kyber = "0.7" 
+pqcrypto-traits = "0.3"
+# Para derivación segura (si se requiere post-KEM)
+hkdf = "0.12"
+sha3 = "0.10"
+
