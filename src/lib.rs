@@ -1,8 +1,10 @@
 use zeroize::Zeroize;
-use pqcrypto_kyber::kyber768::{
-    encapsulate, keypair, PublicKey
-};
-use pqcrypto_traits::kem::{PublicKey as _, Ciphertext as _, SharedSecret as _};
+use pqcrypto_kyber::kyber768::{encapsulate, keypair, PublicKey};
+// Importación explícita de traits para habilitar métodos de conversión
+use pqcrypto_traits::kem::PublicKey as PkTrait;
+use pqcrypto_traits::kem::SecretKey as SkTrait;
+use pqcrypto_traits::kem::Ciphertext as CtTrait;
+use pqcrypto_traits::kem::SharedSecret as SsTrait;
 
 #[repr(C)]
 pub struct VivarBuffer {
@@ -42,8 +44,9 @@ pub extern "C" fn vivar_operator_engine(
 pub extern "C" fn generate_pqc_keys(pk_out: *mut u8, sk_out: *mut u8) -> i32 {
     let (pk, sk) = keypair();
     unsafe {
-        std::ptr::copy_nonoverlapping(pk.as_bytes().as_ptr(), pk_out, 1184);
-        std::ptr::copy_nonoverlapping(sk.as_bytes().as_ptr(), sk_out, 2400);
+        // Uso de traits explícitos para acceder a as_bytes()
+        std::ptr::copy_nonoverlapping(PkTrait::as_bytes(&pk).as_ptr(), pk_out, 1184);
+        std::ptr::copy_nonoverlapping(SkTrait::as_bytes(&sk).as_ptr(), sk_out, 2400);
     }
     0
 }
@@ -62,8 +65,9 @@ pub extern "C" fn perform_kem_encapsulation(
         };
         let (ct, ss) = encapsulate(&pk);
         
-        std::ptr::copy_nonoverlapping(ct.as_bytes().as_ptr(), ct_out, 1088);
-        std::ptr::copy_nonoverlapping(ss.as_bytes().as_ptr(), ss_out, 32);
+        // Uso de traits explícitos para acceder a as_bytes()
+        std::ptr::copy_nonoverlapping(CtTrait::as_bytes(&ct).as_ptr(), ct_out, 1088);
+        std::ptr::copy_nonoverlapping(SsTrait::as_bytes(&ss).as_ptr(), ss_out, 32);
     }
     0
 }
