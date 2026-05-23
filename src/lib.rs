@@ -17,7 +17,6 @@ pub struct VivarBuffer {
 }
 
 /// Motor de Cifrado Vivar: Algoritmo de difusión con realimentación (VCE)
-/// Nivel corporativo: Utiliza realimentación compleja para streaming de baja latencia.
 #[no_mangle]
 pub extern "C" fn vivar_crypt_engine(
     buffer: *mut VivarBuffer,
@@ -25,10 +24,14 @@ pub extern "C" fn vivar_crypt_engine(
     key_len: usize,
     is_encrypt: u8
 ) -> i32 {
+    // Validación de seguridad para evitar punteros nulos
     if buffer.is_null() || key_ptr.is_null() { return 1; }
     
     unsafe {
         let buf = &mut *buffer;
+        // Validación de tamaño para evitar Buffer Overflow
+        if buf.data.is_null() || buf.len == 0 { return 1; }
+
         let data_slice = slice::from_raw_parts_mut(buf.data, buf.len);
         let key_slice = slice::from_raw_parts_mut(key_ptr, key_len);
         
@@ -49,7 +52,6 @@ pub extern "C" fn vivar_crypt_engine(
                 feedback = val;
             }
         }
-        // Borrado seguro de la clave de la RAM tras su uso
         key_slice.zeroize();
     }
     0
@@ -58,6 +60,8 @@ pub extern "C" fn vivar_crypt_engine(
 /// Generación de claves seguras: FIPS 203 (Kyber768)
 #[no_mangle]
 pub extern "C" fn generate_pqc_keys(pk_out: *mut u8, sk_out: *mut u8) -> i32 {
+    if pk_out.is_null() || sk_out.is_null() { return 1; }
+    
     let (pk, sk) = keypair();
     unsafe {
         std::ptr::copy_nonoverlapping(PkTrait::as_bytes(&pk).as_ptr(), pk_out, 1184);
@@ -66,8 +70,7 @@ pub extern "C" fn generate_pqc_keys(pk_out: *mut u8, sk_out: *mut u8) -> i32 {
     0
 }
 
-/// Encapsulación de clave con derivación HKDF (Nivel Corporativo)
-/// Garantiza que cada sesión de cifrado sea única, incluso con la misma clave pública.
+/// Encapsulación de clave con derivación HKDF
 #[no_mangle]
 pub extern "C" fn perform_kem_encapsulation(
     pk_in: *const u8, 
@@ -76,6 +79,11 @@ pub extern "C" fn perform_kem_encapsulation(
     salt: *const u8, 
     salt_len: usize
 ) -> i32 {
+    // Validaciones defensivas contra punteros nulos
+    if pk_in.is_null() || ct_out.is_null() || ss_out.is_null() || salt.is_null() {
+        return 4;
+    }
+    
     unsafe {
         let pk = match PublicKey::from_bytes(slice::from_raw_parts(pk_in, 1184)) {
             Ok(k) => k,
@@ -83,7 +91,6 @@ pub extern "C" fn perform_kem_encapsulation(
         };
         let (ss, ct) = encapsulate(&pk);
         
-        // Derivación de clave robusta usando HKDF-SHA256
         let salt_slice = slice::from_raw_parts(salt, salt_len);
         let hk = Hkdf::<Sha256>::new(Some(salt_slice), ss.as_bytes());
         
