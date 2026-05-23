@@ -1,18 +1,16 @@
-// Importamos el keypair, pero NO los structs que colisionan con los traits
-use pqcrypto_kyber::kyber512::keypair;
-// Importamos los traits con nombres distintos para evitar colisiones
-use pqcrypto_traits::kem::PublicKey as PublicKeyTrait;
-use pqcrypto_traits::kem::SecretKey as SecretKeyTrait;
+use pqcrypto_kyber::kyber512::{keypair, PublicKey, SecretKey};
+use pqcrypto_traits::kem::PublicKey as _;
+use pqcrypto_traits::kem::SecretKey as _;
 
 #[no_mangle]
 pub extern "C" fn generar_llaves_pqc() -> *mut (Vec<u8>, Vec<u8>) {
     let (pk, sk) = keypair();
     
-    // Ahora, al usar el alias del trait, el compilador sabe exactamente dónde buscar as_bytes()
-    let pk_bytes = pk.as_bytes().to_vec();
-    let sk_bytes = sk.as_bytes().to_vec();
+    // Convertimos a bytes usando los traits importados
+    let pk_vec = <PublicKey as pqcrypto_traits::kem::PublicKey>::as_bytes(&pk).to_vec();
+    let sk_vec = <SecretKey as pqcrypto_traits::kem::SecretKey>::as_bytes(&sk).to_vec();
     
-    let resultado = Box::new((pk_bytes, sk_bytes));
+    let resultado = Box::new((pk_vec, sk_vec));
     Box::into_raw(resultado)
 }
 
