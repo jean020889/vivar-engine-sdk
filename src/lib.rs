@@ -1,20 +1,15 @@
-use pqcrypto_kyber::kyber512::{keypair};
+// core/src/lib.rs
+use pqcrypto_kyber::kyber768; // Algoritmo PQC estándar NIST
+use argon2::{Argon2, PasswordHasher, PasswordHash, PasswordVerifier};
 
 #[no_mangle]
-pub extern "C" fn generar_llaves_pqc() -> *mut (Vec<u8>, Vec<u8>) {
-    let (pk, sk) = keypair();
-    
-    // Convertimos directamente a Vec<u8> sin invocar métodos de traits conflictivos
-    let pk_vec = pk.to_bytes().to_vec();
-    let sk_vec = sk.to_bytes().to_vec();
-    
-    let resultado = Box::new((pk_vec, sk_vec));
-    Box::into_raw(resultado)
-}
-
-#[no_mangle]
-pub extern "C" fn liberar_llaves(ptr: *mut (Vec<u8>, Vec<u8>)) {
-    if !ptr.is_null() {
-        unsafe { drop(Box::from_raw(ptr)); }
-    }
+pub extern "C" fn vivar_operator_engine(
+    data_ptr: *mut u8, 
+    data_len: usize, 
+    key_ptr: *const u8, 
+    key_len: usize
+) -> i32 {
+    // 1. Aquí aplicarías tu lógica de mutación Vivar original
+    // combinada con la clave PQC derivada.
+    0 // Retorno de éxito
 }
