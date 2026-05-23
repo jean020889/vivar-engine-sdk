@@ -1,1 +1,70 @@
-templates/
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Vivar Engine Pro</title>
+    <style>
+        body { font-family: sans-serif; max-width: 500px; margin: 2rem auto; padding: 1rem; }
+        .control { margin-bottom: 1rem; }
+        #progressBar { width: 100%; height: 20px; display: none; }
+    </style>
+</head>
+<body>
+    <h2>Vivar Engine SDK</h2>
+    
+    <div class="control">
+        <input type="password" id="clave" placeholder="Ingresa tu clave">
+    </div>
+
+    <div class="control">
+        <select id="modo">
+            <option value="cifrar">Cifrar</option>
+            <option value="descifrar">Descifrar</option>
+        </select>
+    </div>
+
+    <div class="control">
+        <input type="file" id="archivoSecreto" placeholder="Archivo a ocultar">
+    </div>
+
+    <div class="control">
+        <input type="file" id="archivoPortador" placeholder="Archivo portador">
+    </div>
+
+    <button onclick="ejecutar()">Ejecutar Proceso</button>
+
+    <progress id="progressBar" value="0" max="100"></progress>
+
+    <div class="control">
+        <a id="btnDescarga" style="display:none;">Descargar Archivo Resultante</a>
+    </div>
+
+    <script>
+        async function ejecutar() {
+            const formData = new FormData();
+            formData.append('archivo', document.getElementById('archivoSecreto').files[0]);
+            formData.append('clave', document.getElementById('clave').value);
+            
+            const bar = document.getElementById('progressBar');
+            bar.style.display = 'block';
+
+            // Llamada al endpoint de tu API
+            const response = await fetch('/cifrar', { method: 'POST', body: formData });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.getElementById('btnDescarga');
+                
+                // Mantiene el nombre original del archivo portador para invisibilidad
+                a.href = url;
+                a.download = document.getElementById('archivoPortador').files[0].name;
+                a.style.display = 'block';
+                a.textContent = "Descargar: " + a.download;
+                bar.value = 100;
+            }
+        }
+    </script>
+</body>
+</html>
+
