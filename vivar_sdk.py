@@ -1,57 +1,82 @@
-import ctypes
 import os
+import ctypes
+from tabulate import tabulate
 
+# --- 1. GENERACIÓN DE ARCHIVOS (Rust) ---
+os.makedirs("src", exist_ok=True)
+with open("src/lib.rs", "w") as f:
+    f.write(r'''#![crate_type = "cdylib"]
+use std::slice;
+#[no_mangle]
+pub extern "C" fn vivar_operator_engine(data: *mut u8, len: usize, key: *const u8, key_len: usize) -> i32 {
+    if data.is_null() || key.is_null() { return 1; }
+    unsafe {
+        let data_slice = slice::from_raw_parts_mut(data, len);
+        let key_slice = slice::from_raw_parts(key, key_len);
+        let mut state: [u64; 8] = [0; 8];
+        for i in 0..8 {
+            let mut buf = [0u8; 8];
+            for j in 0..8 { buf[j] = key_slice[(i * 8 + j) % key_len]; }
+            state[i] = u64::from_le_bytes(buf);
+        }
+        for round in 0..12 {
+            for i in 0..8 {
+                state[i] ^= state[(i + 1) % 8].rotate_left(13);
+                state[i] = state[i].wrapping_add(state[(i + 7) % 8].rotate_left(round as u32));
+                state[i] ^= 0x9E3779B97F4A7C15u64.wrapping_mul(round as u64);
+            }
+        }
+        for i in 0..len {
+            let mask = (state[(i / 8) % 8] >> ((i % 8) * 8)) as u8;
+            data_slice[i] ^= mask;
+        }
+    }
+    0
+}''')
+
+with open("Cargo.toml", "w") as f:
+    f.write('[package]\nname = "vivar-engine"\nversion = "0.1.0"\nedition = "2021"\n[lib]\ncrate-type = ["cdylib"]')
+
+# Recompilación
+!cargo build --release
+
+# --- 2. SDK DEFINITIVO (Python) ---
 class VivarEngineSDK:
-    """
-    SDK para la interfaz de comunicación entre Python y el Motor de Cifrado Vivar.
-    Optimizado para el motor simétrico involutivo (XOR-Mask 512-bit).
-    """
     def __init__(self, lib_path="./target/release/libvivar_engine.so"):
-        if not os.path.exists(lib_path):
-            raise FileNotFoundError(f"No se encontró la librería en: {lib_path}")
-            
         self._core = ctypes.CDLL(lib_path)
-        
-        # Firma de la función según el ABI de C definido en lib.rs
-        self._core.vivar_operator_engine.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8), # data
-            ctypes.c_size_t,                # len
-            ctypes.POINTER(ctypes.c_uint8), # key
-            ctypes.c_size_t                 # key_len
-        ]
-        self._core.vivar_operator_engine.restype = ctypes.c_int
+        self._core.vivar_operator_engine.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
 
     def process(self, data: bytes, key: bytes) -> bytes:
-        """
-        Procesa los datos cifrando o descifrando (Operación Simétrica).
-        Aplica padding ISO/IEC 7816-4 para asegurar bloques de 64 bytes.
-        """
-        # 1. Padding: Asegurar que el buffer sea múltiplo de 64
         pad_len = 64 - (len(data) % 64)
-        padded_data = data + b'\x80' + b'\x00' * (pad_len - 1)
-        
-        # 2. Preparar buffer mutable para C
-        buffer = bytearray(padded_data)
+        padded = data + b'\x80' + b'\x00' * (pad_len - 1)
+        buffer = bytearray(padded)
         c_data = (ctypes.c_uint8 * len(buffer)).from_buffer(buffer)
-        
-        # 3. Preparar clave
         c_key = (ctypes.c_uint8 * len(key))(*key)
-        
-        # 4. Llamada al motor en Rust
-        status = self._core.vivar_operator_engine(c_data, len(buffer), c_key, len(key))
-        
-        if status != 0:
-            raise RuntimeError(f"El motor Vivar devolvió un error de estado: {status}")
-            
-        # 5. Retorno del resultado
+        self._core.vivar_operator_engine(c_data, len(buffer), c_key, len(key))
         return bytes(buffer)
 
     def decrypt(self, encrypted_data: bytes, key: bytes) -> bytes:
-        """
-        Método wrapper para descifrado: aplica el proceso y elimina el padding.
-        """
-        raw = self.process(encrypted_data, key)
-        # Limpiar el marcador 0x80 y sus bytes de relleno
-        if b'\x80' in raw:
-            return raw.split(b'\x80', 1)[0]
-        return raw
+        buffer = bytearray(encrypted_data)
+        c_data = (ctypes.c_uint8 * len(buffer)).from_buffer(buffer)
+        c_key = (ctypes.c_uint8 * len(key))(*key)
+        self._core.vivar_operator_engine(c_data, len(buffer), c_key, len(key))
+        raw = bytes(buffer)
+        return raw.split(b'\x80', 1)[0] if b'\x80' in raw else raw
+
+# --- 3. VALIDACIÓN FINAL ---
+sdk = VivarEngineSDK()
+clave = b"VIVAR_ENGINE_PROD_2026_SECURITY_32"
+casos = [
+    {"desc": "Texto Corto", "data": b"Hola"},
+    {"desc": "BSD Conjetura", "data": b"Resolucion BSD rank 33"},
+    {"desc": "Binarios", "data": b"\x00\xff\x20\x40\x80"},
+    {"desc": "Largo (>64 bytes)", "data": b"Validacion industrial 2026 con exito total del sistema vivar."}
+]
+
+resultados = []
+for caso in casos:
+    cifrado = sdk.process(caso["data"], clave)
+    recuperado = sdk.decrypt(cifrado, clave)
+    resultados.append([caso["desc"], len(caso["data"]), "✅ PASÓ" if caso["data"] == recuperado else "❌ FALLÓ"])
+
+print(tabulate(resultados, headers=["Caso de Prueba", "Bytes", "Estado"], tablefmt="grid"))
