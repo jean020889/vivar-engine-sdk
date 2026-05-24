@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -19,18 +20,16 @@
         .btn-action:active { background-color: #1e293b; }
         .btn-download { width: 100%; padding: 16px; background-color: #16a34a; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; display: block; box-sizing: border-box; margin-top: 20px; }
         .btn-download:active { background-color: #15803d; }
+        .btn-reset { width: 100%; padding: 12px; background-color: #64748b; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; box-sizing: border-box; margin-top: 10px; }
         .file-box { border: 2px dashed #cbd5e1; padding: 15px; border-radius: 10px; background: #f8fafc; text-align: center; margin-bottom: 15px; cursor: pointer; }
         .file-box input { display: block; margin: 8px auto 0 auto; font-size: 14px; }
         .error { background: #fef2f2; color: #b91c1c; padding: 12px; border-radius: 8px; border: 1px solid #fca5a5; font-size: 14px; margin-bottom: 15px; font-weight: 500; }
-        
-        /* Barra de progreso animada */
         .progress-container { display: none; margin-top: 20px; }
         .progress-bar { width: 100%; background-color: #e2e8f0; border-radius: 10px; overflow: hidden; height: 12px; }
         .progress-fill { width: 0%; height: 100%; background-color: #0284c7; border-radius: 10px; transition: width 0.4s ease; }
         .progress-text { text-align: center; font-size: 13px; color: #64748b; margin-top: 6px; font-weight: 500; }
     </style>
     <script>
-        // Simulación visual de la barra de progreso solicitada antes de procesar el binario
         function iniciarProcesamiento() {
             document.getElementById("btn-submit-stego").style.display = "none";
             document.getElementById("progress-area").style.display = "block";
@@ -47,13 +46,6 @@
                     txt.innerText = "Procesando en Core Rust ARX... " + width + "%";
                 }
             }, 150);
-        }
-
-        // Limpieza absoluta de clave y reinicio de la vista al descargar el archivo
-        function resetearProceso() {
-            setTimeout(function() {
-                window.location.href = "/";
-            }, 1000);
         }
     </script>
 </head>
@@ -91,7 +83,7 @@
 
     {% if step == 2 %}
     <form method="POST" enctype="multipart/form-data" onsubmit="iniciarProcesamiento()">
-        <input type="hidden" name="action" value="ejecutar_estego">
+        <input type="hidden" name="action" value="ejecutar_stego">
         <input type="hidden" name="clave" value="{{ clave }}">
         <input type="hidden" name="operacion" value="{{ operacion }}">
 
@@ -123,12 +115,14 @@
     {% if step == 3 %}
     <div style="text-align: center;">
         <p style="color: #16a34a; font-weight: bold; font-size: 16px; margin-top: 0;">¡Operación Completada con Éxito!</p>
-        <p style="font-size: 14px; color: #475569;">El archivo resultante mantiene el nombre exacto y es funcional.</p>
+        <p style="font-size: 14px; color: #475569; margin-bottom: 15px;">El archivo está listo para ser descargado.</p>
         
-        <a href="/download/{{ archivo_resultante }}/{{ nombre_descarga }}" 
-           class="btn-download" 
-           onclick="resetearProceso()">
-            📥 Descargar Archivo y Reiniciar
+        <a href="/download/{{ archivo_resultante }}/{{ nombre_descarga }}" class="btn-download">
+            📥 Descargar Archivo Real
+        </a>
+
+        <a href="/" class="btn-reset">
+            🔄 Nueva Operación (Limpiar Pantalla)
         </a>
     </div>
     {% endif %}
