@@ -1,33 +1,48 @@
 import os
+import zlib
 
 class SteganoHandler:
+    MARCADOR = b"VIVAR_ENGINE_SECRET_V1"
+    
+    @staticmethod
+    def _comprimir(data: bytes) -> bytes:
+        return zlib.compress(data, level=9)
+
+    @staticmethod
+    def _descomprimir(data: bytes) -> bytes:
+        return zlib.decompress(data)
+
     @staticmethod
     def ocultar_en_portador(archivo_cifrado: bytes, ruta_portador: str, ruta_salida: str):
         """
-        Oculta los datos cifrados al final del archivo portador.
-        Esto permite que el archivo original siga siendo funcional (reproducible).
+        Oculta datos cifrados y comprimidos. 
+        Si el archivo ya tiene datos, se sobrescriben o se lanza una advertencia.
         """
-        with open(ruta_portador, 'rb') as f_portador:
-            data_portador = f_portador.read()
+        datos_preparados = SteganoHandler._comprimir(archivo_cifrado)
+        
+        with open(ruta_portador, 'rb') as f:
+            contenido_original = f.read()
             
-        with open(ruta_salida, 'wb') as f_salida:
-            # Escribimos el portador original
-            f_salida.write(data_portador)
-            # Añadimos un delimitador mágico (EOF marker) para saber dónde empieza lo oculto
-            f_salida.write(b"VIVAR_EOF") 
-            # Añadimos los datos cifrados
-            f_salida.write(archivo_cifrado)
+        # Detección: Verificar si el portador ya ha sido utilizado
+        if SteganoHandler.MARCADOR in contenido_original:
+            raise Exception("El portador ya contiene datos cifrados. Operación abortada.")
+            
+        with open(ruta_salida, 'wb') as f:
+            f.write(contenido_original)
+            f.write(SteganoHandler.MARCADOR)
+            f.write(datos_preparados)
 
     @staticmethod
     def extraer_de_portador(ruta_portador: str) -> bytes:
         """
-        Extrae los datos ocultos buscando el delimitador.
+        Extrae, valida y descomprime los datos ocultos.
         """
         with open(ruta_portador, 'rb') as f:
             contenido = f.read()
             
-        if b"VIVAR_EOF" in contenido:
-            _, datos_ocultos = contenido.split(b"VIVAR_EOF", 1)
-            return datos_ocultos
-        else:
-            raise ValueError("No se encontraron datos ocultos en el portador.")
+        if SteganoHandler.MARCADOR not in contenido:
+            raise ValueError("No se encontraron datos ocultos.")
+            
+        # Separación y descompresión
+        _, datos_comprimidos = contenido.split(SteganoHandler.MARCADOR, 1)
+        return SteganoHandler._descomprimir(datos_comprimidos)
