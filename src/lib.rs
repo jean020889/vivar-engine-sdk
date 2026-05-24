@@ -1,7 +1,8 @@
 #![crate_type = "cdylib"]
 
 use std::slice;
-use zeroize::Zeroize;
+// Ya no necesitamos zeroize aquí si no queremos destruir la clave automáticamente
+// use zeroize::Zeroize; 
 
 #[repr(i32)]
 pub enum VceError {
@@ -24,8 +25,7 @@ fn vivar_diffusion_operator(data: &mut [u8], key: &[u8]) {
         let key_byte = key[i % key_len] as u64;
         let index = i as u64;
         
-        // Transformación simétrica: no depende de estados previos (feedback)
-        // Esto permite que cifrado == descifrado
+        // Transformación simétrica: no depende de estados previos
         let transformation = (constant ^ index ^ key_byte).rotate_left(7);
         
         *val ^= (transformation & 0xFF) as u8;
@@ -48,9 +48,10 @@ pub extern "C" fn vivar_operator_engine(
         // La misma función realiza cifrado y descifrado
         vivar_diffusion_operator(data_slice, key_slice);
         
-        // Limpiamos la clave de memoria
-        let mut mut_key = slice::from_raw_parts_mut(key_ptr, key_len);
-        mut_key.zeroize();
+        // NOTA: Hemos eliminado el mut_key.zeroize() para permitir 
+        // que el usuario realice procesos consecutivos (cifrar/descifrar)
+        // con la misma clave. La gestión de memoria de la clave ahora 
+        // es responsabilidad del SDK en Python.
     }
     VceError::Success as i32
 }
