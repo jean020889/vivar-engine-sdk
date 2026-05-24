@@ -1,3 +1,13 @@
+# Interfaz y manejo de sistema
+ipywidgets
+# Manejo de binarios y archivos
+numpy
+# Criptografía y utilidades
+cryptography
+# Comunicación con el núcleo (si usas PyO3/Rust)
+cffi
+# Gestión de entorno
+setuptools
 streamlit
 pyngrok
 
