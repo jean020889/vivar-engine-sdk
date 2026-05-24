@@ -3,19 +3,18 @@ name = "vivar-engine"
 version = "0.1.0"
 edition = "2021"
 
-# Configuración del motor para ser una librería dinámica compatible con C
+# Configuración del motor como librería dinámica compatible con C-ABI
 [lib]
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
-# Optimizaciones de nivel industrial para criptografía
+# Optimizaciones de nivel industrial para rendimiento criptográfico nativo
 [profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-# Mantenemos strip = false para que ctypes pueda encontrar los nombres de funciones
-strip = false 
+opt-level = 3          # Máxima optimización de código y bucles ARX
+lto = true             # Optimización en tiempo de enlazado (Link-Time Optimization)
+codegen-units = 1      # Reduce paralelismo de compilación para maximizar optimizaciones globales
+panic = "abort"        # Elimina el desenrollado de pila reduciendo el tamaño del binario
+strip = true           # Elimina símbolos de depuración. El binario queda ultra-ligero y ctypes funciona perfectamente
 
 [dependencies]
 zeroize = { version = "1.8", features = ["derive"] }
