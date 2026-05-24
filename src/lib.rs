@@ -1,4 +1,4 @@
-# Actualizamos el núcleo en src/lib.rs para encadenar el estado
+# 1. Reescribir el archivo lib.rs para eliminar el texto que causó el error
 with open("src/lib.rs", "w") as f:
     f.write("""#![crate_type = "cdylib"]
 use std::slice;
@@ -16,13 +16,12 @@ pub extern "C" fn vivar_operator_engine(
         let data_slice = slice::from_raw_parts_mut(data, len);
         let key_slice = slice::from_raw_parts(key, key_len);
         
-        // Estado inicial de entropía
         let mut state: u64 = 0x9E3779B97F4A7C15;
         
         for (i, val) in data_slice.iter_mut().enumerate() {
             let k_byte = key_slice[i % key_len] as u64;
             
-            // DIFUSIÓN ENCADENADA: El estado depende del valor previo del dato
+            // Difusión encadenada: el estado depende del valor previo del dato
             state = state.rotate_left(13)
                          .wrapping_add(k_byte ^ (i as u64) ^ (*val as u64));
             
@@ -34,5 +33,9 @@ pub extern "C" fn vivar_operator_engine(
 }
 """)
 
-# Re-compilar el núcleo con la nueva lógica
+# 2. Asegurar que el entorno de Rust esté activo
+import os
+os.environ["PATH"] += os.pathsep + os.path.expanduser("~/.cargo/bin")
+
+# 3. Compilar nuevamente
 !cargo build --release
