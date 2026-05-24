@@ -1,4 +1,5 @@
-cd ~/vivar-engine-sdk/web/templates && cat << 'EOF' > index.html
+mkdir -p ~/vivar-engine-sdk/web/templates
+cat << 'EOF' > ~/vivar-engine-sdk/web/templates/index.html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -31,7 +32,7 @@ cd ~/vivar-engine-sdk/web/templates && cat << 'EOF' > index.html
         .progress-text { text-align: center; font-size: 13px; color: #64748b; margin-top: 6px; font-weight: 500; }
     </style>
     <script>
-        // Simulación de barra de progreso antes de la respuesta del servidor
+        // Simulación visual de la barra de progreso solicitada antes de procesar el binario
         function iniciarProcesamiento() {
             document.getElementById("btn-submit-stego").style.display = "none";
             document.getElementById("progress-area").style.display = "block";
@@ -50,7 +51,7 @@ cd ~/vivar-engine-sdk/web/templates && cat << 'EOF' > index.html
             }, 150);
         }
 
-        // Limpieza de clave y reinicio estructural de la app al descargar
+        // Limpieza absoluta de clave y reinicio de la vista al descargar el archivo
         function resetearProceso() {
             setTimeout(function() {
                 window.location.href = "/";
@@ -123,8 +124,8 @@ cd ~/vivar-engine-sdk/web/templates && cat << 'EOF' > index.html
 
     {% if step == 3 %}
     <div style="text-align: center;">
-        <p style="color: #16a34a; font-weight: bold; font-size: 16px; margin-top: 0;">¡Operación Completada de Forma Exitosa!</p>
-        <p style="font-size: 14px; color: #475569;">El archivo resultante mantiene las propiedades funcionales del contenedor original.</p>
+        <p style="color: #16a34a; font-weight: bold; font-size: 16px; margin-top: 0;">¡Operación Completada con Éxito!</p>
+        <p style="font-size: 14px; color: #475569;">El archivo resultante mantiene el nombre exacto y es funcional.</p>
         
         <a href="/download/{{ archivo_resultante }}/{{ nombre_descarga }}" 
            class="btn-download" 
@@ -137,3 +138,4 @@ cd ~/vivar-engine-sdk/web/templates && cat << 'EOF' > index.html
 
 </body>
 </html>
+EOF
