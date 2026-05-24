@@ -1,18 +1,20 @@
 [package]
-name = "core"
+name = "vivar-engine"
 version = "0.1.0"
 edition = "2021"
 
+# Configuración del motor para ser una librería dinámica compatible con C
 [lib]
-crate-type = ["cdylib", "staticlib"]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
 
+# Optimizaciones de nivel industrial para criptografía
 [profile.release]
 opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
-# Hemos desactivado 'strip' para que los nombres de las funciones 
-# (símbolos) sean visibles para Python y ctypes.
+# Mantenemos strip = false para que ctypes pueda encontrar los nombres de funciones
 strip = false 
 
 [dependencies]
