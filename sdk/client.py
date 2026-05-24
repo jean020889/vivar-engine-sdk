@@ -3,66 +3,70 @@ import os
 
 class VivarSDK:
     """
-    Cliente para interactuar con el Vivar Encryption Engine (Core en Rust).
+    Cliente para interactuar con el motor criptográfico Vivar.
+    Gestiona la comunicación con la librería compartida (libcore.so).
     """
     def __init__(self, lib_path=None):
-        # Localiza el binario compilado automáticamente
+        # 1. Localización automática del binario compilado
         if lib_path is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
+            # Buscamos en el directorio estándar de cargo
             lib_path = os.path.abspath(os.path.join(base_dir, "../target/release/libcore.so"))
             
         if not os.path.exists(lib_path):
-            raise FileNotFoundError(f"No se encuentra el binario libcore.so en: {lib_path}")
+            raise FileNotFoundError(f"No se encuentra el motor nativo en: {lib_path}. Ejecuta 'cargo build --release'.")
         
-        # Carga la librería compartida
+        # 2. Carga de la librería
         self.lib = ctypes.CDLL(lib_path)
         
-        # --- DEFINICIÓN DE TIPOS (FFI) ---
-        # Aseguramos que la firma coincida con el motor Rust
-        self.lib.vivar_crypt_engine.argtypes = [
-            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint8
+        # 3. Definición de la firma de la función FFI (Foreign Function Interface)
+        # Firma en Rust: (data_ptr: *mut u8, data_len: usize, key_ptr: *const u8, key_len: usize, mode: u8)
+        self.lib.vivar_operator_engine.argtypes = [
+            ctypes.POINTER(ctypes.c_uint8), # data_ptr (mutable)
+            ctypes.c_size_t,                # data_len
+            ctypes.POINTER(ctypes.c_uint8), # key_ptr (const)
+            ctypes.c_size_t,                # key_len
+            ctypes.c_uint8                  # mode
         ]
-        self.lib.generate_pqc_keys.argtypes = [
-            ctypes.c_void_p, ctypes.c_void_p
-        ]
-        self.lib.perform_kem_encapsulation.argtypes = [
-            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t
-        ]
+        self.lib.vivar_operator_engine.restype = ctypes.c_int
 
-    def generar_claves(self):
-        """Genera par de claves Kyber768 (pk, sk)."""
-        pk = ctypes.create_string_buffer(1184)
-        sk = ctypes.create_string_buffer(2400)
-        self.lib.generate_pqc_keys(pk, sk)
-        return pk.raw, sk.raw
-
-    def encapsular(self, pk_bytes, salt=b"vivar-salt-default"):
-        """Encapsula clave pública PQC usando un salt."""
-        pk_buffer = ctypes.create_string_buffer(pk_bytes, 1184)
-        ct = ctypes.create_string_buffer(1088)
-        ss = ctypes.create_string_buffer(32)
-        salt_buffer = ctypes.create_string_buffer(salt)
-        
-        self.lib.perform_kem_encapsulation(pk_buffer, ct, ss, salt_buffer, len(salt))
-        return ct.raw, ss.raw
-
-    def mutar_datos(self, datos: bytes, secreto: bytes, is_encrypt: bool = True) -> bytes:
+    def mutar_datos(self, datos: bytes, secreto: bytes, encrypt: bool = True) -> bytes:
         """
-        Aplica mutación Vivar usando secreto compartido.
-        is_encrypt: True para cifrar, False para descifrar.
+        Realiza una mutación de cifrado o descifrado simétrico.
+        
+        :param datos: Los bytes a procesar (ej. tu lista de materiales).
+        :param secreto: La llave de cifrado.
+        :param encrypt: True para cifrar, False para descifrar.
+        :return: bytes procesados.
         """
-        class VivarBuffer(ctypes.Structure):
-            _fields_ = [("data", ctypes.c_char_p), ("len", ctypes.c_size_t)]
+        # Crear buffers de memoria para pasar a C/Rust
+        # create_string_buffer crea un bloque de memoria mutable
+        data_buf = (ctypes.c_uint8 * len(datos))(*datos)
+        key_buf = (ctypes.c_uint8 * len(secreto))(*secreto)
         
-        datos_mutable = ctypes.create_string_buffer(datos)
-        buf = VivarBuffer(datos_mutable, len(datos))
+        # Modo: 1 para Cifrar, 0 para Descifrar
+        mode = 1 if encrypt else 0
         
-        # Llamada al motor nativo con flag de cifrado
-        res = self.lib.vivar_crypt_engine(
-            ctypes.byref(buf), secreto, len(secreto), 1 if is_encrypt else 0
+        # Llamada al motor nativo
+        status = self.lib.vivar_operator_engine(
+            data_buf, 
+            len(datos), 
+            key_buf, 
+            len(secreto), 
+            mode
         )
         
-        if res != 0:
-            raise RuntimeError(f"Error crítico en la mutación Vivar (Código: {res})")
+        if status != 0:
+            raise RuntimeError(f"El motor Vivar ha retornado un error crítico (Código: {status})")
             
-        return datos_mutable.raw
+        return bytes(data_buf)
+
+    def cifrar_archivo(self, ruta_entrada: str, ruta_salida: str, secreto: bytes):
+        """Utilidad para cifrar archivos completos en disco."""
+        with open(ruta_entrada, 'rb') as f:
+            datos = f.read()
+        
+        cifrados = self.mutar_datos(datos, secreto, encrypt=True)
+        
+        with open(ruta_salida, 'wb') as f:
+            f.write(cifrados)
