@@ -59,7 +59,7 @@
     {% endif %}
 
     {% if step == 1 %}
-    <form method="POST">
+    <form method="POST" action="/">
         <input type="hidden" name="action" value="validar_clave">
         
         <label for="clave">Colocar Clave de Seguridad:</label>
@@ -82,7 +82,7 @@
     {% endif %}
 
     {% if step == 2 %}
-    <form method="POST" enctype="multipart/form-data" onsubmit="iniciarProcesamiento()">
+    <form method="POST" action="/" enctype="multipart/form-data" onsubmit="iniciarProcesamiento()">
         <input type="hidden" name="action" value="ejecutar_stego">
         <input type="hidden" name="clave" value="{{ clave }}">
         <input type="hidden" name="operacion" value="{{ operacion }}">
