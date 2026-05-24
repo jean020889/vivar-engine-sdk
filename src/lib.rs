@@ -14,23 +14,21 @@ pub extern "C" fn vivar_operator_engine(
         let data_slice = slice::from_raw_parts_mut(data, len);
         let key_slice = slice::from_raw_parts(key, key_len);
         
-        let mut state: u64 = 0x9E3779B97F4A7C15;
-        
         for (i, val) in data_slice.iter_mut().enumerate() {
             let k_byte = key_slice[i % key_len] as u64;
             
-            // Incrementamos la complejidad: mezclamos el índice, la llave y el valor
-            state = state.rotate_left(13)
-                         .wrapping_add(k_byte)
-                         .wrapping_add(i as u64)
-                         .wrapping_add(*val as u64);
+            // Operador Vivar-A: Estado basado en posición e índice (Determinista e Involutivo)
+            // Usamos una función de mezcla que no depende del valor cifrado, 
+            // permitiendo que el descifrado sea idéntico.
+            let mut state: u64 = (i as u64).wrapping_add(k_byte);
+            state = state.wrapping_mul(0xbf58476d1ce4e5b9);
+            state ^= state >> 30;
+            state = state.wrapping_mul(0x94d049bb133111eb);
+            state ^= state >> 27;
+            state = state.wrapping_mul(0xbf58476d1ce4e5b9);
             
-            // Aplicamos una transformación no lineal al estado para generar la máscara
-            let mask = ((state ^ (state >> 33)).wrapping_mul(0xff51afd7ed558ccd)) as u8;
-            
-            // Cifrado y encadenamiento: el valor cifrado actual modifica el estado del siguiente
+            let mask = (state & 0xFF) as u8;
             *val ^= mask;
-            state = state.wrapping_add(*val as u64); 
         }
     }
     0
