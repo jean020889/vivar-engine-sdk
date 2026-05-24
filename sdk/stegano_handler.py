@@ -1,36 +1,33 @@
 import os
-import shutil
 
 class SteganoHandler:
     @staticmethod
-    def procesar(portador_path, datos_cifrados, salida_path):
+    def ocultar_en_portador(archivo_cifrado: bytes, ruta_portador: str, ruta_salida: str):
         """
-        Copia el portador original y adjunta los datos cifrados de forma segura.
+        Oculta los datos cifrados al final del archivo portador.
+        Esto permite que el archivo original siga siendo funcional (reproducible).
         """
-        # Crear copia para no afectar el archivo original
-        shutil.copy2(portador_path, salida_path)
-        
-        # Adjuntar al final (Append mode)
-        with open(salida_path, 'ab') as f:
-            # Marcador de inicio (opcional, para identificar datos Vivar al descifrar)
-            f.write(b"VIVAR_DATA_START")
-            f.write(datos_cifrados)
-            f.write(b"VIVAR_DATA_END")
+        with open(ruta_portador, 'rb') as f_portador:
+            data_portador = f_portador.read()
             
-        return True
+        with open(ruta_salida, 'wb') as f_salida:
+            # Escribimos el portador original
+            f_salida.write(data_portador)
+            # Añadimos un delimitador mágico (EOF marker) para saber dónde empieza lo oculto
+            f_salida.write(b"VIVAR_EOF") 
+            # Añadimos los datos cifrados
+            f_salida.write(archivo_cifrado)
 
     @staticmethod
-    def extraer(archivo_procesado):
+    def extraer_de_portador(ruta_portador: str) -> bytes:
         """
-        Lee el archivo y extrae solo la parte que contiene los datos cifrados.
+        Extrae los datos ocultos buscando el delimitador.
         """
-        with open(archivo_procesado, 'rb') as f:
+        with open(ruta_portador, 'rb') as f:
             contenido = f.read()
             
-        start_tag = b"VIVAR_DATA_START"
-        end_tag = b"VIVAR_DATA_END"
-        
-        if start_tag in contenido and end_tag in contenido:
-            return contenido.split(start_tag)[1].split(end_tag)[0]
-        return None
-      
+        if b"VIVAR_EOF" in contenido:
+            _, datos_ocultos = contenido.split(b"VIVAR_EOF", 1)
+            return datos_ocultos
+        else:
+            raise ValueError("No se encontraron datos ocultos en el portador.")
