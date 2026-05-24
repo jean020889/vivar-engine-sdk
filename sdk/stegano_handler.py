@@ -1,48 +1,54 @@
 import os
 import zlib
+import shutil
+import tempfile
 
 class SteganoHandler:
     MARCADOR = b"VIVAR_ENGINE_SECRET_V1"
     
     @staticmethod
-    def _comprimir(data: bytes) -> bytes:
-        return zlib.compress(data, level=9)
-
-    @staticmethod
-    def _descomprimir(data: bytes) -> bytes:
-        return zlib.decompress(data)
-
-    @staticmethod
     def ocultar_en_portador(archivo_cifrado: bytes, ruta_portador: str, ruta_salida: str):
         """
-        Oculta datos cifrados y comprimidos. 
-        Si el archivo ya tiene datos, se sobrescriben o se lanza una advertencia.
+        Oculta datos usando streaming para no cargar el video completo en RAM.
         """
-        datos_preparados = SteganoHandler._comprimir(archivo_cifrado)
+        datos_preparados = zlib.compress(archivo_cifrado, level=9)
         
-        with open(ruta_portador, 'rb') as f:
-            contenido_original = f.read()
+        # Usamos un archivo temporal para construir el nuevo portador de forma segura
+        fd, temp_path = tempfile.mkstemp()
+        
+        try:
+            with open(ruta_portador, 'rb') as f_in, os.fdopen(fd, 'wb') as f_out:
+                # 1. Copiar el portador original bloque a bloque (streaming)
+                shutil.copyfileobj(f_in, f_out)
+                
+                # 2. Inyectar marca y datos cifrados/comprimidos
+                f_out.write(SteganoHandler.MARCADOR)
+                f_out.write(datos_preparados)
             
-        # Detección: Verificar si el portador ya ha sido utilizado
-        if SteganoHandler.MARCADOR in contenido_original:
-            raise Exception("El portador ya contiene datos cifrados. Operación abortada.")
+            # Reemplazar el original con el nuevo archivo procesado
+            shutil.move(temp_path, ruta_salida)
             
-        with open(ruta_salida, 'wb') as f:
-            f.write(contenido_original)
-            f.write(SteganoHandler.MARCADOR)
-            f.write(datos_preparados)
+        except Exception as e:
+            if os.path.exists(temp_path): os.remove(temp_path)
+            raise e
 
     @staticmethod
     def extraer_de_portador(ruta_portador: str) -> bytes:
         """
-        Extrae, valida y descomprime los datos ocultos.
+        Extrae datos buscando el marcador al final del archivo.
         """
         with open(ruta_portador, 'rb') as f:
-            contenido = f.read()
+            # Buscar el marcador desde el final del archivo para eficiencia (O(1))
+            f.seek(0, os.SEEK_END)
+            tamanio = f.tell()
             
-        if SteganoHandler.MARCADOR not in contenido:
-            raise ValueError("No se encontraron datos ocultos.")
+            # Leemos los últimos KB buscando el marcador
+            busqueda_tam = min(tamanio, 1024 * 1024) # Buscar en los últimos 1MB
+            f.seek(-busqueda_tam, os.SEEK_END)
+            bloque = f.read()
             
-        # Separación y descompresión
-        _, datos_comprimidos = contenido.split(SteganoHandler.MARCADOR, 1)
-        return SteganoHandler._descomprimir(datos_comprimidos)
+            if SteganoHandler.MARCADOR not in bloque:
+                raise ValueError("No se encontraron datos ocultos.")
+                
+            _, datos_comprimidos = bloque.split(SteganoHandler.MARCADOR, 1)
+            return zlib.decompress(datos_comprimidos)
