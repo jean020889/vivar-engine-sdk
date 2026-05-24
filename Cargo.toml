@@ -11,7 +11,9 @@ opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
-strip = true
+# Hemos desactivado 'strip' para que los nombres de las funciones 
+# (símbolos) sean visibles para Python y ctypes.
+strip = false 
 
 [dependencies]
 zeroize = { version = "1.8", features = ["derive"] }
