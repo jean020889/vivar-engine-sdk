@@ -61,21 +61,16 @@ def index():
                     file_secreto.save(path_secreto)
                     file_portador.save(path_portador)
 
-                    # Leer y cifrar el secreto
                     with open(path_secreto, "rb") as f:
                         datos_secreto = f.read()
                     secreto_cifrado = sdk.process(datos_secreto, clave_bytes)
 
-                    # Leer el portador
                     with open(path_portador, "rb") as f:
                         datos_portador = f.read()
 
-                    # Estructura Metadata: Guardamos el nombre original exacto del secreto
                     meta = {"filename": file_secreto.filename}
                     meta_bytes = json.dumps(meta).encode("utf-8")
                     
-                    # Estructura del empaquetado esteganográfico al final del portador
-                    # [Portador] + [Secreto Cifrado] + [Meta JSON] + [Tam Meta (4B)] + [Tam Secreto (4B)] + [Firma (5B)]
                     tam_secreto_bytes = len(secreto_cifrado).to_bytes(4, byteorder="big")
                     tam_meta_bytes = len(meta_bytes).to_bytes(4, byteorder="big")
                     marca_magica = b"VIVAR"
@@ -109,7 +104,6 @@ def index():
                         error = "El archivo no contiene ningún secreto detectable."
                         return render_template("index.html", step=2, clave=clave, operacion=operacion, error=error)
 
-                    # Desempaquetar leyendo desde el final de forma exacta para evitar corrupción
                     fin_firma = len(datos_totales) - 5
                     ini_tam_secreto = fin_firma - 4
                     ini_tam_meta = ini_tam_secreto - 4
@@ -120,15 +114,12 @@ def index():
                     ini_meta = ini_tam_meta - tam_meta
                     ini_secreto = ini_meta - tam_secreto
                     
-                    # Extraer bytes puros sin basura sobrante
                     meta_bytes = datos_totales[ini_meta:ini_tam_meta]
                     secreto_cifrado = datos_totales[ini_secreto:ini_meta]
 
-                    # Decodificar nombre original
                     meta_data = json.loads(meta_bytes.decode("utf-8"))
                     nombre_original = meta_data.get("filename", "secreto_recuperado.pdf")
 
-                    # Descifrar en el Core Rust
                     secreto_original = sdk.decrypt(secreto_cifrado, clave_bytes)
 
                     output_path = os.path.join(app.config['UPLOAD_FOLDER'], "extraido_secreto")
@@ -147,18 +138,12 @@ def index():
 
     return render_template("index.html", step=step, clave=clave, operacion=operacion, archivo_resultante=archivo_resultante, nombre_descarga=nombre_descarga, error=error)
 
+# MODIFICACIÓN CRÍTICA: Quitamos el borrado inmediato para permitir estabilidad en Android
 @app.route("/download/<filename>/<download_name>")
 def download(filename, download_name):
     path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     if os.path.exists(path):
-        response = send_file(path, as_attachment=True, download_name=download_name)
-        @response.call_on_close
-        def cleanup():
-            try:
-                os.remove(path)
-            except:
-                pass
-        return response
+        return send_file(path, as_attachment=True, download_name=download_name)
     return redirect(url_for("index"))
 
 if __name__ == "__main__":
