@@ -2,33 +2,56 @@ import ctypes
 import os
 
 class VivarEngineSDK:
-    def __init__(self, lib_path: str = "./target/release/libvivar_engine.so"):
+    """
+    SDK para la interfaz de comunicación entre Python y el Motor de Cifrado Vivar.
+    Optimizado para el motor simétrico involutivo (XOR-Mask 512-bit).
+    """
+    def __init__(self, lib_path="./target/release/libvivar_engine.so"):
         if not os.path.exists(lib_path):
-            raise FileNotFoundError("Motor no encontrado.")
+            raise FileNotFoundError(f"No se encontró la librería en: {lib_path}")
             
         self._core = ctypes.CDLL(lib_path)
+        
+        # Firma de la función según el ABI de C definido en lib.rs
         self._core.vivar_operator_engine.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t
+            ctypes.POINTER(ctypes.c_uint8), # data
+            ctypes.c_size_t,                # len
+            ctypes.POINTER(ctypes.c_uint8), # key
+            ctypes.c_size_t                 # key_len
         ]
         self._core.vivar_operator_engine.restype = ctypes.c_int
 
-    def _pad(self, data: bytes) -> bytes:
-        pad_len = 64 - (len(data) % 64)
-        return data + b'\x80' + b'\x00' * (pad_len - 1)
-
-    def _unpad(self, data: bytes) -> bytes:
-        return data.rstrip(b'\x00').rstrip(b'\x80')
-
     def process(self, data: bytes, key: bytes) -> bytes:
-        padded = self._pad(data)
-        mutable_data = bytearray(padded)
-        key_data = bytearray(key)
+        """
+        Procesa los datos cifrando o descifrando (Operación Simétrica).
+        Aplica padding ISO/IEC 7816-4 para asegurar bloques de 64 bytes.
+        """
+        # 1. Padding: Asegurar que el buffer sea múltiplo de 64
+        pad_len = 64 - (len(data) % 64)
+        padded_data = data + b'\x80' + b'\x00' * (pad_len - 1)
         
-        c_data = (ctypes.c_uint8 * len(mutable_data)).from_buffer(mutable_data)
-        c_key = (ctypes.c_uint8 * len(key_data)).from_buffer(key_data)
+        # 2. Preparar buffer mutable para C
+        buffer = bytearray(padded_data)
+        c_data = (ctypes.c_uint8 * len(buffer)).from_buffer(buffer)
         
-        status = self._core.vivar_operator_engine(c_data, len(mutable_data), c_key, len(key_data))
-        if status != 0: raise RuntimeError("Error en el núcleo de seguridad.")
+        # 3. Preparar clave
+        c_key = (ctypes.c_uint8 * len(key))(*key)
+        
+        # 4. Llamada al motor en Rust
+        status = self._core.vivar_operator_engine(c_data, len(buffer), c_key, len(key))
+        
+        if status != 0:
+            raise RuntimeError(f"El motor Vivar devolvió un error de estado: {status}")
             
-        return self._unpad(bytes(mutable_data))
+        # 5. Retorno del resultado
+        return bytes(buffer)
+
+    def decrypt(self, encrypted_data: bytes, key: bytes) -> bytes:
+        """
+        Método wrapper para descifrado: aplica el proceso y elimina el padding.
+        """
+        raw = self.process(encrypted_data, key)
+        # Limpiar el marcador 0x80 y sus bytes de relleno
+        if b'\x80' in raw:
+            return raw.split(b'\x80', 1)[0]
+        return raw
