@@ -1,7 +1,7 @@
 import os
 import ctypes
 import platform
-from flask import Flask, render_template, request, send_file, redirect, url_for, make_response
+from flask import Flask, render_template, request, send_file, make_response
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -12,6 +12,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 SECRET_PATH = os.path.join(BASE_DIR, "secret.bin")
 CT_PATH = os.path.join(BASE_DIR, "ciphertext.bin")
 SEPARATOR = b"###VIVAR_PQC_DATA###"
+META_SEPARATOR = b"|||"
 
 # --- CONFIGURACIÓN MOTOR ---
 ext = ".so" if platform.system() != "Windows" else ".dll"
@@ -19,8 +20,6 @@ lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{e
 if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
 
 lib = ctypes.CDLL(lib_path)
-lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-lib.generate_ciphertext.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.vivar_pqc_process.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
 
 def init_crypto():
@@ -45,19 +44,24 @@ def ocultar():
     if not os.path.exists(SECRET_PATH): init_crypto()
     
     portador = request.files['file_portador'].read()
-    secreto = bytearray(request.files['file_secreto'].read())
+    file_secreto = request.files['file_secreto']
+    nombre_archivo = file_secreto.filename.encode()
+    secreto = bytearray(file_secreto.read())
     
     secret_key = open(SECRET_PATH, "rb").read()
     ciphertext = open(CT_PATH, "rb").read()
     
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
-    filename = secure_filename(request.files['file_portador'].filename)
-    ruta = os.path.join(UPLOAD_FOLDER, filename)
-    with open(ruta, "wb") as f: f.write(portador + SEPARATOR + secreto)
+    # Empaquetamos: Nombre + Meta Separador + Datos
+    payload = nombre_archivo + META_SEPARATOR + secreto
+    
+    filename_portador = secure_filename(request.files['file_portador'].filename)
+    ruta = os.path.join(UPLOAD_FOLDER, filename_portador)
+    with open(ruta, "wb") as f: f.write(portador + SEPARATOR + payload)
     
     response = make_response(send_file(ruta, mimetype="application/octet-stream"))
-    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    response.headers["Content-Disposition"] = f"attachment; filename={filename_portador}"
     return response
 
 @app.route("/extraer", methods=["POST"])
@@ -67,7 +71,8 @@ def extraer():
     archivo_cargado = request.files['file_cargado'].read()
     if SEPARATOR not in archivo_cargado: return "Archivo inválido", 400
     
-    _, secreto_cifrado = archivo_cargado.split(SEPARATOR)
+    _, payload = archivo_cargado.split(SEPARATOR)
+    nombre_original, secreto_cifrado = payload.split(META_SEPARATOR, 1)
     secreto = bytearray(secreto_cifrado)
     
     secret_key = open(SECRET_PATH, "rb").read()
@@ -75,11 +80,11 @@ def extraer():
     
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
-    ruta_out = os.path.join(UPLOAD_FOLDER, "secreto_recuperado.bin")
+    ruta_out = os.path.join(UPLOAD_FOLDER, nombre_original.decode())
     with open(ruta_out, "wb") as f: f.write(secreto)
     
     response = make_response(send_file(ruta_out, mimetype="application/octet-stream"))
-    response.headers["Content-Disposition"] = "attachment; filename=secreto_recuperado.bin"
+    response.headers["Content-Disposition"] = f"attachment; filename={nombre_original.decode()}"
     return response
 
 if __name__ == "__main__":
