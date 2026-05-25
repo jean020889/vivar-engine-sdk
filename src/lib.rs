@@ -1,7 +1,9 @@
 #![crate_type = "cdylib"]
 
 use zeroize::Zeroize;
+// Importamos los tipos Y los traits (interfaces) necesarios
 use pqcrypto_kyber::kyber768::{decapsulate, Ciphertext, SecretKey};
+use pqcrypto_traits::kem::{Ciphertext as _, SecretKey as _, SharedSecret as _};
 use hkdf::Hkdf;
 use sha2::Sha256;
 
@@ -23,24 +25,23 @@ pub extern "C" fn vivar_pqc_process(
     }
 
     unsafe {
-        // 2. Conversión segura de bytes a tipos PQC
         let ct_bytes = std::slice::from_raw_parts(ciphertext, ct_len);
         let sk_bytes = std::slice::from_raw_parts(secret_key, sk_len);
 
+        // Ahora, gracias a los traits importados, from_bytes funcionará
         let ct = match Ciphertext::from_bytes(ct_bytes) {
             Ok(c) => c,
-            Err(_) => return 2, // Error: Ciphertext inválido
+            Err(_) => return 2,
         };
         
         let sk = match SecretKey::from_bytes(sk_bytes) {
             Ok(s) => s,
-            Err(_) => return 3, // Error: SecretKey inválido
+            Err(_) => return 3,
         };
         
-        // Decapsulación (Kyber768 devuelve SharedSecret directamente)
         let ss = decapsulate(&ct, &sk);
 
-        // 3. Derivación de clave industrial (HKDF-SHA256)
+        // ss.as_bytes() ahora funcionará gracias al trait SharedSecret
         let hk = Hkdf::<Sha256>::new(None, ss.as_bytes());
         let mut key_bytes = [0u8; 32];
         
@@ -50,7 +51,6 @@ pub extern "C" fn vivar_pqc_process(
         
         let mut session_key = SessionKey(key_bytes);
         
-        // 4. Difusión de estado (ARX)
         let data_slice = std::slice::from_raw_parts_mut(data, len);
         let mut state: u64 = 0x5A5A5A5A5A5A5A5A;
         
@@ -63,7 +63,6 @@ pub extern "C" fn vivar_pqc_process(
             data_slice[i] ^= key_byte ^ mask;
         }
 
-        // 5. Limpieza absoluta
         session_key.zeroize();
         state.zeroize();
     }
