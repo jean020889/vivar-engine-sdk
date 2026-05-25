@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vivar Engine - Panel Esteganográfico</title>
+    <title>Vivar Engine - Panel de Grado Militar</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 15px; color: #212529; }
-        .card { max-width: 480px; margin: 20px auto; background: #ffffff; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e9ecef; }
+        .card { max-width: 480px; margin: 20px auto; background: #ffffff; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e9ecef; }
         h3 { text-align: center; color: #1e293b; margin-top: 0; margin-bottom: 25px; font-weight: 700; }
         label { font-weight: 600; display: block; margin-top: 15px; margin-bottom: 8px; font-size: 14px; color: #475569; }
         input[type="password"], input[type="file"] { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; background-color: #f8fafc; }
@@ -25,7 +25,7 @@
 <body>
 
 <div class="card">
-    <h3>🔏 Vivar Engine SDK</h3>
+    <h3>🔏 Vivar Engine SDK (Vault PQC)</h3>
 
     {% if step == 1 %}
     <form method="POST" action="/">
@@ -53,24 +53,32 @@
 
         {% if operacion == "cifrar" %}
         <label>Archivo Secreto:</label>
-        <input type="file" name="file_secreto" required>
+        <input type="file" name="file_secreto" id="file_secreto" required>
         <label>Archivo Portador:</label>
-        <input type="file" name="file_portador" required>
+        <input type="file" name="file_portador" id="file_portador" required>
         {% else %}
         <label>Archivo Esteganografiado:</label>
-        <input type="file" name="file_cargado" required>
+        <input type="file" name="file_cargado" id="file_cargado" required>
         {% endif %}
 
-        <button type="submit" id="btn-submit" class="btn-action">Procesar en Vivar Engine</button>
+        <button type="submit" id="btn-submit" class="btn-action">Ejecutar Operación PQC</button>
         
         <div id="prog" class="progress-container">
             <div class="progress-bar"><div class="progress-fill"></div></div>
-            <p style="font-size:12px; margin-top:10px; color:#64748b;">Inyectando clave espectral...</p>
+            <p style="font-size:12px; margin-top:10px; color:#64748b;">Procesando Vault Post-Cuántico...</p>
         </div>
     </form>
 
     <script>
-        document.getElementById('procForm').addEventListener('submit', function() {
+        document.getElementById('procForm').addEventListener('submit', function(e) {
+            const inputs = document.querySelectorAll('input[type="file"]');
+            for (let input of inputs) {
+                if (input.files[0].size > 50 * 1024 * 1024) { // Límite de 50MB por seguridad
+                    alert("El archivo es demasiado grande para procesamiento PQC seguro.");
+                    e.preventDefault();
+                    return;
+                }
+            }
             document.getElementById('btn-submit').disabled = true;
             document.getElementById('btn-submit').innerText = 'Procesando...';
             document.getElementById('prog').style.display = 'block';
