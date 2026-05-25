@@ -15,7 +15,7 @@ panic = "abort"
 strip = true
 
 [dependencies]
-# Dependencias base
+# Dependencias base (mantenidas)
 zeroize = { version = "1.8", features = ["derive"] }
 pqcrypto-kyber = "0.7"
 pqcrypto-traits = "0.3"
@@ -24,10 +24,9 @@ sha2 = "0.10"
 hmac = "0.12"
 subtle = "2.6"
 
-# Dependencia WASM declarada como opcional para evitar errores de compilación
+# Dependencia WASM declarada como opcional
 wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
 default = []
-# Al activar el feature 'wasm', se habilita la dependencia wasm-bindgen
 wasm = ["dep:wasm-bindgen"]
