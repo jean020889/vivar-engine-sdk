@@ -17,11 +17,12 @@
         .radio-btn input:checked + label { background: #0284c7; color: white; border-color: #0284c7; }
         .btn-action { width: 100%; padding: 14px; background-color: #0f172a; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
         .file-box { border: 2px dashed #cbd5e1; padding: 15px; border-radius: 10px; background: #f8fafc; text-align: center; margin-bottom: 15px; }
-        .file-box input { display: block; margin: 8px auto 0 auto; }
+        .file-box input { display: block; margin: 8px auto 0 auto; width: 100%; }
         .error { background: #fef2f2; color: #b91c1c; padding: 12px; border-radius: 8px; border: 1px solid #fca5a5; font-size: 14px; margin-bottom: 15px; }
         .progress-container { display: none; margin-top: 20px; }
         .progress-bar { width: 100%; background-color: #e2e8f0; border-radius: 10px; overflow: hidden; height: 12px; }
-        .progress-fill { width: 0%; height: 100%; background-color: #0284c7; }
+        .progress-fill { width: 100%; height: 100%; background-color: #0284c7; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
     </style>
 </head>
 <body>
@@ -29,23 +30,32 @@
 <div class="card">
     <h3>🔏 Vivar Engine SDK</h3>
 
-    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
 
     {% if step == 1 %}
     <form method="POST" action="/">
         <input type="hidden" name="action" value="validar_clave">
         <label>Clave de Seguridad:</label>
-        <input type="password" name="clave" required>
+        <input type="password" name="clave" required minlength="4">
+        
         <div class="radio-box">
-            <div class="radio-btn"><input type="radio" id="c" name="operacion" value="cifrar" checked><label for="c">🔒 Cifrar</label></div>
-            <div class="radio-btn"><input type="radio" id="d" name="operacion" value="descifrar"><label for="d">🔓 Descifrar</label></div>
+            <div class="radio-btn">
+                <input type="radio" id="c" name="operacion" value="cifrar" checked>
+                <label for="c">🔒 Cifrar</label>
+            </div>
+            <div class="radio-btn">
+                <input type="radio" id="d" name="operacion" value="descifrar">
+                <label for="d">🔓 Descifrar</label>
+            </div>
         </div>
         <button type="submit" class="btn-action">Continuar</button>
     </form>
     {% endif %}
 
     {% if step == 2 %}
-    <form method="POST" action="/" enctype="multipart/form-data" onsubmit="document.getElementById('btn').style.display='none'; document.getElementById('prog').style.display='block';">
+    <form method="POST" action="/" enctype="multipart/form-data" onsubmit="this.querySelector('button').style.display='none'; document.getElementById('prog').style.display='block';">
         <input type="hidden" name="action" value="ejecutar_stego">
         <input type="hidden" name="clave" value="{{ clave }}">
         <input type="hidden" name="operacion" value="{{ operacion }}">
@@ -62,20 +72,20 @@
             <input type="file" name="file_portador" required>
         </div>
 
-        <button type="submit" id="btn" class="btn-action">Ejecutar Proceso</button>
+        <button type="submit" class="btn-action">Ejecutar Proceso</button>
         
         <div id="prog" class="progress-container">
-            <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
-            <p style="text-align:center; font-size:12px;">Procesando en Core Rust...</p>
+            <div class="progress-bar"><div class="progress-fill"></div></div>
+            <p style="text-align:center; font-size:12px; margin-top:10px;">Procesando en Core Rust...</p>
         </div>
     </form>
     {% endif %}
 
     {% if step == 3 %}
     <div style="text-align:center;">
-        <p style="color:#16a34a; font-weight:bold;">¡Operación exitosa!</p>
-        <a href="/download/{{ archivo_resultante }}/{{ nombre_descarga }}" class="btn-action" style="text-decoration:none;">📥 Descargar</a>
-        <a href="/" style="display:block; margin-top:15px; font-size:13px; color:#64748b;">🔄 Reiniciar</a>
+        <p style="color:#16a34a; font-weight:bold; font-size: 18px;">¡Operación exitosa!</p>
+        <a href="/download/{{ archivo_resultante }}" class="btn-action" style="display:block; text-decoration:none;">📥 Descargar Resultado</a>
+        <a href="/" style="display:block; margin-top:20px; font-size:14px; color:#64748b;">🔄 Volver a Inicio</a>
     </div>
     {% endif %}
 </div>
