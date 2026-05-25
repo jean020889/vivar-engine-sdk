@@ -1,7 +1,7 @@
 import os
 import ctypes
 import platform
-from flask import Flask, render_template, request, send_file, make_response
+from flask import Flask, render_template, request, send_file, make_response, redirect, url_for
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -39,8 +39,9 @@ def index():
         return render_template("index.html", step=2, clave=request.form.get("clave"), operacion=request.form.get("operacion"))
     return render_template("index.html", step=1)
 
-@app.route("/ocultar", methods=["POST"])
+@app.route("/ocultar", methods=["POST", "GET"])
 def ocultar():
+    if request.method == "GET": return redirect(url_for('index'))
     if not os.path.exists(SECRET_PATH): init_crypto()
     
     portador = request.files['file_portador'].read()
@@ -63,18 +64,19 @@ def ocultar():
     response.headers["Content-Disposition"] = f"attachment; filename={filename_portador}"
     return response
 
-@app.route("/extraer", methods=["POST"])
+@app.route("/extraer", methods=["POST", "GET"])
 def extraer():
+    if request.method == "GET": return redirect(url_for('index'))
     if not os.path.exists(SECRET_PATH): init_crypto()
     
     archivo_cargado = request.files['file_cargado'].read()
     if SEPARATOR not in archivo_cargado: return "Archivo inválido", 400
     
-    # 1. Usamos maxsplit=1 para evitar errores si el archivo contiene el separador
+    # 1. Separamos portador del payload usando maxsplit=1
     partes = archivo_cargado.split(SEPARATOR, 1)
     payload = partes[1]
     
-    # 2. Separamos el nombre del resto de datos con maxsplit=1
+    # 2. Separamos nombre de los datos cifrados usando maxsplit=1
     nombre_original, secreto_cifrado = payload.split(META_SEPARATOR, 1)
     secreto = bytearray(secreto_cifrado)
     
