@@ -6,15 +6,15 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'temp_uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Carga del motor PQC (libvivar_engine.so compilado con Kyber-768)
+# Cargamos el motor PQC compilado (libvivar_engine.so)
 lib_path = os.path.abspath('../target/release/libvivar_engine.so')
 lib = ctypes.CDLL(lib_path)
 
-# Definición de la interfaz con Rust
+# Definición de la interfaz PQC con Rust
 lib.vivar_pqc_process.argtypes = [
-    ctypes.c_char_p, ctypes.c_size_t, 
-    ctypes.c_char_p, ctypes.c_size_t, 
-    ctypes.c_char_p, ctypes.c_size_t
+    ctypes.c_char_p, ctypes.c_size_t,      # Datos (portador)
+    ctypes.c_char_p, ctypes.c_size_t,      # Ciphertext (KEM)
+    ctypes.c_char_p, ctypes.c_size_t       # Secret Key (Privada)
 ]
 lib.vivar_pqc_process.restype = ctypes.c_int
 
@@ -24,17 +24,20 @@ def index():
         action = request.form.get("action")
         
         if action == "ejecutar_stego_pqc":
-            # Captura de elementos cuánticos (Zero-Knowledge)
+            # Captura de elementos cuánticos del cliente
             file_portador = request.files.get('file_portador')
-            ciphertext = request.form.get('ciphertext') # Base64
-            secret_key = request.form.get('secret_key') # Base64
+            # Ciphertext y SecretKey provistos por el cliente tras el handshake Kyber-768
+            ciphertext = request.form.get('ciphertext') 
+            secret_key = request.form.get('secret_key') 
             
-            if not file_portador or not ciphertext or not secret_key:
-                return "Error: Credenciales cuánticas faltantes", 400
+            if not all([file_portador, ciphertext, secret_key]):
+                return render_template("index.html", step=2, error="Faltan credenciales cuánticas.")
 
+            # Leer datos en un buffer mutable
             portador_data = bytearray(file_portador.read())
             
-            # Procesamiento PQC en el motor Rust (Zero-Knowledge)
+            # Ejecución en el motor Rust (Intercambio cuántico interno)
+            # El motor realiza el decapsulado y cifra en tiempo constante
             status = lib.vivar_pqc_process(
                 (ctypes.c_char * len(portador_data)).from_buffer(portador_data),
                 len(portador_data),
@@ -43,13 +46,14 @@ def index():
             )
             
             if status == 0:
+                # Guardado seguro del archivo cifrado
                 ruta = os.path.join(UPLOAD_FOLDER, file_portador.filename)
                 with open(ruta, "wb") as f:
                     f.write(portador_data)
-                return render_template("index.html", step=3, archivo_resultante=file_portador.filename)
+                return render_template("index.html", step=3, archivo=file_portador.filename)
             else:
-                return "Error en desencapsulación PQC", 500
-
+                return render_template("index.html", step=2, error="Fallo en la sesión cuántica.")
+                
     return render_template("index.html", step=1)
 
 @app.route("/download/<filename>")
