@@ -1,7 +1,8 @@
 import os
 import sys
-import shutil  # Necesario para copiar archivos
+import shutil
 
+# Ruta del SDK
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from flask import Flask, render_template, request, send_file
@@ -9,28 +10,17 @@ from vivar_sdk import VivarEngineSDK
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'temp_uploads'
-# Definimos la ruta de descargas de Android
+# Ruta de almacenamiento de Android (para Termux)
 ANDROID_DOWNLOADS = os.path.expanduser("~/storage/downloads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 sdk = VivarEngineSDK(lib_path='../target/release/libvivar_engine.so')
 
-def guardar_y_duplicar(contenido, nombre_guardado, nombre_original):
-    """Guarda el archivo en el server y lo copia a Android Downloads."""
-    ruta_servidor = os.path.join(UPLOAD_FOLDER, nombre_guardado)
-    with open(ruta_servidor, "wb") as f:
-        f.write(contenido)
-    
-    # Intentamos copiar a Descargas de Android si la carpeta existe
-    if os.path.exists(ANDROID_DOWNLOADS):
-        shutil.copy2(ruta_servidor, os.path.join(ANDROID_DOWNLOADS, nombre_original))
-    
-    return ruta_servidor
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
         action = request.form.get("action")
+        
         if action == "validar_clave":
             return render_template("index.html", step=2, clave=request.form.get("clave"), operacion=request.form.get("operacion"))
             
@@ -42,16 +32,36 @@ def index():
             
             try:
                 datos = file_portador.read()
+                
                 if operacion == "cifrar":
-                    res = sdk.process(datos, clave)
+                    datos_secreto = request.files.get("file_secreto").read()
+                    res = sdk.process(datos_secreto, clave)
                     nombre_g = "MUTATED_" + nombre_orig
-                    guardar_y_duplicar(datos + res, nombre_g, nombre_orig)
-                else:
+                    
+                    # 1. Guardar solo en servidor para la web
+                    ruta_servidor = os.path.join(UPLOAD_FOLDER, nombre_g)
+                    with open(ruta_servidor, "wb") as f: f.write(datos + res)
+                    
+                    # 2. Copiar a Termux/Android Downloads (Opcional si quieres copia local)
+                    if os.path.exists(ANDROID_DOWNLOADS):
+                        shutil.copy2(ruta_servidor, os.path.join(ANDROID_DOWNLOADS, nombre_g))
+                        
+                    return render_template("index.html", step=3, archivo_resultante=nombre_g, nombre_descarga=nombre_orig)
+                
+                else: # Descifrar
                     res = sdk.decrypt(datos, clave)
                     nombre_g = "RECUPERADO_" + nombre_orig
-                    guardar_y_duplicar(res, nombre_g, nombre_orig)
-                
-                return render_template("index.html", step=3, archivo_resultante=nombre_g, nombre_descarga=nombre_orig)
+                    
+                    # Guardar archivo para la web
+                    ruta_servidor = os.path.join(UPLOAD_FOLDER, nombre_g)
+                    with open(ruta_servidor, "wb") as f: f.write(res)
+                    
+                    # Copiar a Termux/Android Downloads automáticamente
+                    if os.path.exists(ANDROID_DOWNLOADS):
+                        shutil.copy2(ruta_servidor, os.path.join(ANDROID_DOWNLOADS, nombre_orig))
+                        
+                    return render_template("index.html", step=3, archivo_resultante=nombre_g, nombre_descarga=nombre_orig)
+            
             except Exception as e:
                 return render_template("index.html", step=1, error=str(e))
     return render_template("index.html", step=1)
