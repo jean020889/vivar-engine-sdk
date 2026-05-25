@@ -16,11 +16,22 @@ META_SEPARATOR = b"|||"
 
 # --- CONFIGURACIÓN MOTOR ---
 ext = ".so" if platform.system() != "Windows" else ".dll"
+# Buscamos en la ruta absoluta correcta según tu estructura
 lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{ext}")
-if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
+if not os.path.exists(lib_path): 
+    lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
 
 lib = ctypes.CDLL(lib_path)
-lib.vivar_pqc_process.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
+
+# Definición de tipos de datos para la interfaz C
+lib.vivar_pqc_process.argtypes = [
+    ctypes.POINTER(ctypes.c_char), 
+    ctypes.c_size_t,               
+    ctypes.POINTER(ctypes.c_char), 
+    ctypes.c_size_t,               
+    ctypes.POINTER(ctypes.c_char), 
+    ctypes.c_size_t                
+]
 
 def init_crypto():
     pk = ctypes.create_string_buffer(1184)
@@ -52,17 +63,19 @@ def ocultar():
     secret_key = open(SECRET_PATH, "rb").read()
     ciphertext = open(CT_PATH, "rb").read()
     
-    lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
+    # Llamada al motor con conversión a punteros c_char
+    lib.vivar_pqc_process(
+        (ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto),
+        ctypes.c_char_p(ciphertext), 1088,
+        ctypes.c_char_p(secret_key), 2400
+    )
     
     payload = nombre_archivo + META_SEPARATOR + secreto
-    
     filename_portador = secure_filename(request.files['file_portador'].filename)
     ruta = os.path.join(UPLOAD_FOLDER, filename_portador)
     with open(ruta, "wb") as f: f.write(portador + SEPARATOR + payload)
     
-    response = make_response(send_file(ruta, mimetype="application/octet-stream"))
-    response.headers["Content-Disposition"] = f"attachment; filename={filename_portador}"
-    return response
+    return send_file(ruta, mimetype="application/octet-stream", as_attachment=True, download_name=filename_portador)
 
 @app.route("/extraer", methods=["POST", "GET"])
 def extraer():
@@ -72,26 +85,24 @@ def extraer():
     archivo_cargado = request.files['file_cargado'].read()
     if SEPARATOR not in archivo_cargado: return "Archivo inválido", 400
     
-    # 1. Separamos portador del payload usando maxsplit=1
     partes = archivo_cargado.split(SEPARATOR, 1)
     payload = partes[1]
-    
-    # 2. Separamos nombre de los datos cifrados usando maxsplit=1
     nombre_original, secreto_cifrado = payload.split(META_SEPARATOR, 1)
     secreto = bytearray(secreto_cifrado)
     
     secret_key = open(SECRET_PATH, "rb").read()
     ciphertext = open(CT_PATH, "rb").read()
     
-    # 3. Procesamos SOLO los datos cifrados
-    lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
+    lib.vivar_pqc_process(
+        (ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto),
+        ctypes.c_char_p(ciphertext), 1088,
+        ctypes.c_char_p(secret_key), 2400
+    )
     
     ruta_out = os.path.join(UPLOAD_FOLDER, nombre_original.decode())
     with open(ruta_out, "wb") as f: f.write(secreto)
     
-    response = make_response(send_file(ruta_out, mimetype="application/octet-stream"))
-    response.headers["Content-Disposition"] = f"attachment; filename={nombre_original.decode()}"
-    return response
+    return send_file(ruta_out, mimetype="application/octet-stream", as_attachment=True, download_name=nombre_original.decode())
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
