@@ -256,4 +256,4 @@ if __name__ == "__main__":
         root.mainloop()
     except Exception:
         print("[+] SDK de Vivar Engine listo. (Modo Consola/Biblioteca cargado correctamente).")
-EOF
+
