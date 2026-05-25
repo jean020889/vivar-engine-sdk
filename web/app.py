@@ -7,62 +7,73 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'temp_uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Ruta del binario y clave
+# --- 1. Carga Segura del Motor PQC ---
 lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'target', 'release', 'libvivar_engine.so'))
 key_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'keypair.bin'))
 
+if not os.path.exists(lib_path):
+    print(f"ERROR: No se encontró la librería en {lib_path}.")
+    exit(1)
+
 lib = ctypes.CDLL(lib_path)
 lib.vivar_pqc_process.argtypes = [
-    ctypes.c_char_p, ctypes.c_size_t, # Data
-    ctypes.c_char_p, ctypes.c_size_t, # Ciphertext
-    ctypes.c_char_p, ctypes.c_size_t  # Secret Key
+    ctypes.c_char_p, ctypes.c_size_t,
+    ctypes.c_char_p, ctypes.c_size_t,
+    ctypes.c_char_p, ctypes.c_size_t
 ]
 lib.vivar_pqc_process.restype = ctypes.c_int
 
+# --- 2. Lógica de Negocio ---
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
         action = request.form.get("action")
         
         if action == "validar_clave":
-            return render_template("index.html", step=2)
+            clave = request.form.get("clave")
+            operacion = request.form.get("operacion")
+            if clave and len(clave) >= 4:
+                return render_template("index.html", step=2, clave=clave, operacion=operacion)
+            return render_template("index.html", step=1, error="Clave inválida.")
 
         if action == "ejecutar_stego":
             file_portador = request.files.get('file_portador')
+            clave = request.form.get('clave', '')
             
-            # Carga de clave real de 1184 bytes (o el tamaño de tu keypair)
+            if not os.path.exists(key_path):
+                return render_template("index.html", step=2, error="Error: keypair.bin no encontrado.", clave=clave)
+
             try:
                 with open(key_path, "rb") as f:
-                    key_data = f.read() # Asumimos que contiene los bytes correctos
+                    key_data = f.read()
                 
+                filename = secure_filename(file_portador.filename)
                 portador_data = bytearray(file_portador.read())
                 
-                # Pasamos los buffers reales al motor
-                # ct_dummy es un placeholder hasta que implementes la carga de ciphertext
-                ct_dummy = b'\x00' * 1088 
-                
+                # Ejecución PQC usando los bytes de la clave real
                 status = lib.vivar_pqc_process(
                     (ctypes.c_char * len(portador_data)).from_buffer(portador_data),
                     len(portador_data),
-                    ct_dummy, 1088,
+                    key_data, len(key_data),
                     key_data, len(key_data)
                 )
                 
                 if status == 0:
-                    filename = secure_filename(file_portador.filename)
                     ruta = os.path.join(UPLOAD_FOLDER, filename)
-                    with open(ruta, "wb") as f: f.write(portador_data)
+                    with open(ruta, "wb") as f:
+                        f.write(portador_data)
                     return render_template("index.html", step=3, archivo_resultante=filename)
                 else:
-                    return render_template("index.html", step=2, error=f"Fallo PQC (Código {status})")
+                    return render_template("index.html", step=2, error=f"Error PQC (Status: {status})", clave=clave)
+                    
             except Exception as e:
-                return render_template("index.html", step=2, error=str(e))
+                return render_template("index.html", step=2, error=str(e), clave=clave)
                 
     return render_template("index.html", step=1)
 
 @app.route("/download/<filename>")
 def download(filename):
-    return send_file(os.path.join(UPLOAD_FOLDER, filename), as_attachment=True)
+    return send_file(os.path.join(UPLOAD_FOLDER, secure_filename(filename)), as_attachment=True)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
