@@ -9,36 +9,48 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Rutas absolutas para evitar el error de archivo no encontrado
+SECRET_PATH = os.path.join(BASE_DIR, "secret.bin")
+CT_PATH = os.path.join(BASE_DIR, "ciphertext.bin")
 SEPARATOR = b"###VIVAR_PQC_DATA###"
 
-# --- CONFIGURACIÓN MOTOR ---
+# --- 1. CONFIGURACIÓN DEL MOTOR ---
 ext = ".so" if platform.system() != "Windows" else ".dll"
 lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{ext}")
 if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
 
 lib = ctypes.CDLL(lib_path)
+lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+lib.generate_ciphertext.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.vivar_pqc_process.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
 
-# --- RUTA PRINCIPAL (GET y POST) ---
+# --- 2. INICIALIZACIÓN AUTOMÁTICA ---
+def init_crypto():
+    pk = ctypes.create_string_buffer(1184)
+    sk = ctypes.create_string_buffer(2400)
+    ct = ctypes.create_string_buffer(1088)
+    lib.generate_keys(pk, sk)
+    lib.generate_ciphertext(pk, ct)
+    with open(SECRET_PATH, "wb") as f: f.write(sk.raw)
+    with open(CT_PATH, "wb") as f: f.write(ct.raw)
+
+if not os.path.exists(SECRET_PATH): init_crypto()
+
+# --- 3. RUTAS ---
 @app.route("/", methods=["GET", "POST"])
 def index():
-    if request.method == "GET":
-        return render_template("index.html", step=1)
-    
-    # Manejo del POST inicial (Validación de clave)
+    if request.method == "GET": return render_template("index.html", step=1)
     if request.form.get("action") == "validar_clave":
         return render_template("index.html", step=2, clave=request.form.get("clave"), operacion=request.form.get("operacion"))
-    
     return "Acción no reconocida", 400
 
-# --- RUTA DE OCULTAR ---
 @app.route("/ocultar", methods=["POST"])
 def ocultar():
     portador = request.files['file_portador'].read()
     secreto = bytearray(request.files['file_secreto'].read())
     
-    secret_key = open("secret.bin", "rb").read()
-    ciphertext = open("ciphertext.bin", "rb").read()
+    secret_key = open(SECRET_PATH, "rb").read()
+    ciphertext = open(CT_PATH, "rb").read()
     
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
@@ -47,15 +59,16 @@ def ocultar():
     with open(ruta, "wb") as f: f.write(archivo_final)
     return send_file(ruta, as_attachment=True)
 
-# --- RUTA DE EXTRAER ---
 @app.route("/extraer", methods=["POST"])
 def extraer():
     archivo_cargado = request.files['file_cargado'].read()
+    if SEPARATOR not in archivo_cargado: return "Archivo inválido", 400
+    
     _, secreto_cifrado = archivo_cargado.split(SEPARATOR)
     secreto = bytearray(secreto_cifrado)
     
-    secret_key = open("secret.bin", "rb").read()
-    ciphertext = open("ciphertext.bin", "rb").read()
+    secret_key = open(SECRET_PATH, "rb").read()
+    ciphertext = open(CT_PATH, "rb").read()
     
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
