@@ -11,7 +11,6 @@ use std::slice;
 #[zeroize(drop)]
 struct SessionKey([u8; 32]);
 
-// --- 1. GENERACIÓN DE CLAVES REALES ---
 #[no_mangle]
 pub extern "C" fn generate_keys(pk_ptr: *mut u8, sk_ptr: *mut u8) {
     let (pk, sk) = keypair();
@@ -21,7 +20,6 @@ pub extern "C" fn generate_keys(pk_ptr: *mut u8, sk_ptr: *mut u8) {
     }
 }
 
-// --- 2. GENERACIÓN DE CIPHERTEXT REAL ---
 #[no_mangle]
 pub extern "C" fn generate_ciphertext(pk_ptr: *const u8, ct_ptr: *mut u8) -> i32 {
     let pk_bytes = unsafe { slice::from_raw_parts(pk_ptr, 1184) };
@@ -36,7 +34,6 @@ pub extern "C" fn generate_ciphertext(pk_ptr: *const u8, ct_ptr: *mut u8) -> i32
     0
 }
 
-// --- 3. NÚCLEO DE PROCESAMIENTO PQC ---
 #[no_mangle]
 pub extern "C" fn vivar_pqc_process(
     data: *mut u8, len: usize,
@@ -51,38 +48,31 @@ pub extern "C" fn vivar_pqc_process(
         let ct_bytes = slice::from_raw_parts(ciphertext, ct_len);
         let sk_bytes = slice::from_raw_parts(secret_key, sk_len);
 
-        let ct = match Ciphertext::from_bytes(ct_bytes) {
-            Ok(c) => c,
-            Err(_) => return 2,
-        };
-        
-        let sk = match SecretKey::from_bytes(sk_bytes) {
-            Ok(s) => s,
-            Err(_) => return 3,
-        };
+        let ct = match Ciphertext::from_bytes(ct_bytes) { Ok(c) => c, Err(_) => return 2 };
+        let sk = match SecretKey::from_bytes(sk_bytes) { Ok(s) => s, Err(_) => return 3 };
         
         let ss = decapsulate(&ct, &sk);
-
         let hk = Hkdf::<Sha256>::new(None, ss.as_bytes());
         let mut key_bytes = [0u8; 32];
         
-        if hk.expand(b"VIVAR_INDUSTRIAL_PQC_KEY_2026", &mut key_bytes).is_err() {
-            return 4;
-        }
+        if hk.expand(b"VIVAR_INDUSTRIAL_PQC_KEY_2026", &mut key_bytes).is_err() { return 4; }
         
         let mut session_key = SessionKey(key_bytes);
         let data_slice = slice::from_raw_parts_mut(data, len);
-        let mut state: u64 = 0x5A5A5A5A5A5A5A5A;
         
+        // --- NÚCLEO CORREGIDO PARA INTEGRIDAD BINARIA ---
         for i in 0..len {
             let key_byte = session_key.0[i % 32];
-            state = state.wrapping_add(data_slice[i] as u64).rotate_left(7);
-            let mask = (state ^ (i as u64)).to_le_bytes()[0];
+            // Generación de máscara independiente para asegurar reversibilidad bit-perfect
+            let mut val = (i as u64) ^ 0x5A5A5A5A5A5A5A5A;
+            val = val.wrapping_mul(0xbf58476d1ce4e5b9);
+            val ^= val >> 32;
+            let mask = (val as u8);
+            
             data_slice[i] ^= key_byte ^ mask;
         }
 
         session_key.zeroize();
-        state.zeroize();
     }
     0
 }
