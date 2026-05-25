@@ -49,10 +49,9 @@
     {% endif %}
 
     {% if step == 2 %}
-    <form method="POST" 
+    <form id="procForm" method="POST" 
           action="{{ '/ocultar' if operacion == 'cifrar' else '/extraer' }}" 
-          enctype="multipart/form-data" 
-          onsubmit="document.getElementById('btn-submit').style.display='none'; document.getElementById('prog').style.display='block';">
+          enctype="multipart/form-data">
 
         {% if operacion == "cifrar" %}
         <div class="file-box">
@@ -77,6 +76,18 @@
             <p style="text-align:center; font-size:12px; margin-top:10px;">Procesando en Core Rust...</p>
         </div>
     </form>
+
+    <script>
+        document.getElementById('procForm').addEventListener('submit', function() {
+            document.getElementById('btn-submit').style.display = 'none';
+            document.getElementById('prog').style.display = 'block';
+            
+            // Reinicio automático para evitar que la interfaz se bloquee
+            setTimeout(function() {
+                window.location.href = "/";
+            }, 3500);
+        });
+    </script>
     {% endif %}
 </div>
 
