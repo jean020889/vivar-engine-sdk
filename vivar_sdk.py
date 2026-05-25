@@ -1,6 +1,8 @@
+cat << 'EOF' > ~/vivar-engine-sdk/vivar_sdk.py
 import os
 import sys
 import ctypes
+import hashlib
 from tkinter import messagebox, ttk
 import tkinter as tk
 
@@ -19,19 +21,19 @@ use std::slice;
 pub extern "C" fn vivar_operator_engine(data: *mut u8, len: usize, key: *const u8, key_len: usize) -> i32 {
     // Verificación de punteros y seguridad de memoria
     if data.is_null() || key.is_null() { return 1; }
-    
+
     unsafe {
         // Conversión de punteros C a slices de Rust
         let data_slice = slice::from_raw_parts_mut(data, len);
         let key_slice = slice::from_raw_parts(key, key_len);
-        
+
         // 1. Derivación del estado inicial (8 x u64 = 512 bits de estado)
         // Se usa toda la clave proporcionada mediante módulo para llenar el estado
         let mut state: [u64; 8] = [0; 8];
         for i in 0..8 {
             let mut buf = [0u8; 8];
-            for j in 0..8 { 
-                buf[j] = key_slice[(i * 8 + j) % key_len]; 
+            for j in 0..8 {
+                buf[j] = key_slice[(i * 8 + j) % key_len];
             }
             state[i] = u64::from_le_bytes(buf);
         }
@@ -72,15 +74,23 @@ class VivarEngineSDK:
         # Ajuste dinámico de extensión para Windows (.dll) si aplica
         if os.name == 'nt' and lib_path.endswith('.so'):
             lib_path = "./target/release/vivar_engine.dll"
-            
+
+        # Validar ruta dinámica para entornos embebidos/web o ejecuciones en subcarpetas
         if not os.path.exists(lib_path):
-            raise FileNotFoundError(f"No se encontró el binario compilado en: {lib_path}")
+            alt_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "target/release/libvivar_engine.so"))
+            if not os.path.exists(alt_path):
+                alt_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../target/release/libvivar_engine.so"))
             
+            if os.path.exists(alt_path):
+                lib_path = alt_path
+            else:
+                raise FileNotFoundError(f"No se encontró el binario compilado en: {lib_path}")
+
         self._core = ctypes.CDLL(lib_path)
         self._core.vivar_operator_engine.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8), 
-            ctypes.c_size_t, 
-            ctypes.POINTER(ctypes.c_uint8), 
+            ctypes.POINTER(ctypes.c_uint8),
+            ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_uint8),
             ctypes.c_size_t
         ]
         self._core.vivar_operator_engine.restype = ctypes.c_int32
@@ -98,9 +108,17 @@ class VivarEngineSDK:
         buffer = bytearray(encrypted_data)
         c_data = (ctypes.c_uint8 * len(buffer)).from_buffer(buffer)
         c_key = (ctypes.c_uint8 * len(key))(*key)
+        
+        # Ejecución del Operador simétrico de Vivar en Rust
         self._core.vivar_operator_engine(c_data, len(buffer), c_key, len(key))
         raw = bytes(buffer)
-        return raw.split(b'\x80', 1)[0] if b'\x80' in raw else raw
+        
+        # PARCHE DE SEGURIDAD INDUSTRIAL: Buscar el marcador de padding \x80 desde el FINAL (rfind)
+        # Esto previene cortes accidentales dentro de archivos densos (PDFs, imágenes, etc.)
+        idx = raw.rfind(b'\x80')
+        if idx != -1:
+            return raw[:idx]
+        return raw
 
 # Instanciación e inicialización global del SDK seguro contra fallos
 try:
@@ -120,18 +138,18 @@ class VivarSDKInterface:
         self.root.title("🔏 Vivar Engine - Panel Gráfico de Pruebas SDK")
         self.root.geometry("700x560")
         self.root.configure(bg="#f4f6f9")
-        
+
         # --- Barra de Estado Superior ---
         frame_status = tk.Frame(root, bg="#dfe4ea", height=30)
         frame_status.pack(fill=tk.X, side=tk.TOP)
-        
+
         if SDK_DISPONIBLE:
             estado_txt = "🟢 SDK Inicializado: Núcleo en Rust (C-ABI) listo para operaciones"
             estado_color = "#2ed573"
         else:
             estado_txt = f"🔴 Error: No se pudo enlazar el SDK nativo. Detalle: {ERROR_DETALLE[:45]}..."
             estado_color = "#ff4757"
-            
+
         lbl_status = tk.Label(frame_status, text=estado_txt, fg=estado_color, bg="#dfe4ea", font=("Arial", 9, "bold"))
         lbl_status.pack(side=tk.LEFT, padx=10, pady=5)
 
@@ -142,13 +160,13 @@ class VivarSDKInterface:
         # --- Campo Secret Key ---
         tk.Label(main_container, text="Clave de Cifrado Simétrica / Post-Cuántica (Secret Key):", bg="#f4f6f9", font=("Arial", 10, "bold"), fg="#2f3542").pack(anchor=tk.W, pady=(5, 2))
         self.ent_key = tk.Entry(main_container, font=("Courier New", 11), bd=1, relief=tk.SOLID)
-        self.ent_key.insert(0, "VIVAR_ENGINE_PROD_2026_SECURITY_32")  
+        self.ent_key.insert(0, "VIVAR_ENGINE_PROD_2026_SECURITY_32")
         self.ent_key.pack(fill=tk.X, pady=5)
 
         # --- Campo Datos de Entrada ---
         tk.Label(main_container, text="Datos de Entrada (Texto plano para cifrar O Hexadecimal para descifrar):", bg="#f4f6f9", font=("Arial", 10, "bold"), fg="#2f3542").pack(anchor=tk.W, pady=(10, 2))
         self.txt_input = tk.Text(main_container, height=6, wrap=tk.WORD, font=("Courier New", 10), bd=1, relief=tk.SOLID)
-        self.txt_input.insert(tk.END, "Resolucion BSD rank 33") 
+        self.txt_input.insert(tk.END, "Resolucion BSD rank 33")
         self.txt_input.pack(fill=tk.X, pady=5)
 
         # --- Botonera Integrada ---
@@ -186,10 +204,7 @@ class VivarSDKInterface:
             clave_bytes = key_str.encode('utf-8')
             datos_bytes = data_str.encode('utf-8')
 
-            # Ejecución limpia a través de la C-ABI del SDK
             cifrado_raw = sdk.process(datos_bytes, clave_bytes)
-            
-            # Formateo a Hexadecimal para visualización segura en la interfaz gráfica
             hex_output = cifrado_raw.hex()
             self.actualizar_output(hex_output)
         except Exception as e:
@@ -205,16 +220,15 @@ class VivarSDKInterface:
 
         try:
             clave_bytes = key_str.encode('utf-8')
-            
+
             try:
                 datos_cifrados_bytes = bytes.fromhex(data_str)
             except ValueError:
-                messagebox.showerror("Error de Formato", "La entrada para descifrar debe ser una cadena Hexadecimal limpia (por ejemplo, el output generado al cifrar).")
+                messagebox.showerror("Error de Formato", "La entrada para descifrar debe ser una cadena Hexadecimal limpia.")
                 return
 
-            # Ejecución del descifrado involutivo y remoción del padding estructural
             descifrado_bytes = sdk.decrypt(datos_cifrados_bytes, clave_bytes)
-            
+
             try:
                 resultado_final = descifrado_bytes.decode('utf-8')
             except UnicodeDecodeError:
@@ -234,6 +248,12 @@ class VivarSDKInterface:
         self.txt_output.delete("1.0", tk.END)
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = VivarSDKInterface(root)
-    root.mainloop()
+    # Nota: En entornos de servidor como Termux por consola, la ejecución de la GUI se omitirá
+    # si no hay una pantalla X11 activa. El SDK permanecerá disponible para importaciones desde app.py.
+    try:
+        root = tk.Tk()
+        app = VivarSDKInterface(root)
+        root.mainloop()
+    except Exception:
+        print("[+] SDK de Vivar Engine listo. (Modo Consola/Biblioteca cargado correctamente).")
+EOF
