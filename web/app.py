@@ -1,75 +1,60 @@
 import os
 import sys
-
-# Esto le dice a Python: "Busca módulos también en la carpeta padre (donde está vivar_sdk.py)"
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from flask import Flask, render_template, request, send_file
-# Ahora Python sabrá encontrar vivar_sdk
-from vivar_sdk import VivarEngineSDK 
 
+# Asegurar que el SDK sea encontrado
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from vivar_sdk import VivarEngineSDK
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'temp_uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Instanciamos el motor Vivar (asegúrate que este SDK use la lógica de delimitador VIVAR001)
+# Instancia única del motor
 sdk = VivarEngineSDK(lib_path='../target/release/libvivar_engine.so')
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
+        # 1. Validar que los archivos existan en la petición
+        file_portador = request.files.get('file_portador')
+        if not file_portador:
+            return "Error: No se recibió el archivo portador.", 400
+
         action = request.form.get("action")
-        file_portador = request.files.get("file_portador")
-        
-        # Guardamos el nombre original para evitar perder la referencia
-        nombre_original = file_portador.filename
-        datos_portador = file_portador.read()
+        clave = request.form.get("clave", "").encode()
         
         try:
+            datos = file_portador.read()
+            
             if action == "cifrar":
-                file_secreto = request.files.get("file_secreto")
-                datos_secreto = file_secreto.read()
-                clave = request.form.get("clave").encode()
+                file_secreto = request.files.get('file_secreto')
+                if not file_secreto:
+                    return "Error: Falta el archivo secreto.", 400
                 
-                # Proceso: El SDK retorna [DATOS_CIFRADOS] + [LONGITUD] + [DELIMITADOR]
-                payload = sdk.process(datos_secreto, clave)
-                
-                ruta_salida = os.path.join(UPLOAD_FOLDER, "MUTATED_" + nombre_original)
-                with open(ruta_salida, "wb") as f:
-                    f.write(datos_portador + payload)
-                    
-                return render_template("index.html", step=3, file="MUTATED_" + nombre_original, original=nombre_original)
+                payload = sdk.process(file_secreto.read(), clave)
+                ruta = os.path.join(UPLOAD_FOLDER, "MUTATED_" + file_portador.filename)
+                with open(ruta, "wb") as f:
+                    f.write(datos + payload)
+                return render_template("index.html", step=3, file="MUTATED_" + file_portador.filename, original=file_portador.filename)
             
             elif action == "descifrar":
-                clave = request.form.get("clave").encode()
-                
-                # El SDK busca el delimitador y extrae el payload exacto
-                datos_recuperados = sdk.decrypt(datos_portador, clave)
-                
-                # El nombre se asigna explícitamente sin procesamientos extraños
-                nombre_salida = "EXTRAIDO_" + nombre_original
-                ruta_salida = os.path.join(UPLOAD_FOLDER, nombre_salida)
-                
-                with open(ruta_salida, "wb") as f:
-                    f.write(datos_recuperados)
-                    
-                return render_template("index.html", step=3, file=nombre_salida, original="documento_secreto.pdf")
-                
+                # 2. Descifrado sin procesar nombres (puro)
+                res = sdk.decrypt(datos, clave)
+                ruta = os.path.join(UPLOAD_FOLDER, "EXTRAIDO_" + file_portador.filename)
+                with open(ruta, "wb") as f:
+                    f.write(res)
+                return render_template("index.html", step=3, file="EXTRAIDO_" + file_portador.filename, original=file_portador.filename)
+        
         except Exception as e:
-            return f"Error crítico: {str(e)}"
+            return f"Error en el motor Vivar: {str(e)}", 500
             
     return render_template("index.html", step=1)
 
-@app.route("/download/<filename>/<original_name>")
-def download(filename, original_name):
-    # send_file es la forma más segura de servir binarios sin corrupción
-    return send_file(
-        os.path.join(UPLOAD_FOLDER, filename),
-        as_attachment=True,
-        download_name=original_name,
-        mimetype='application/octet-stream' # Fuerza al navegador a no tocar los bytes
-    )
+@app.route("/download/<filename>/<original>")
+def download(filename, original):
+    # Entrega binaria pura, sin tocar ni un byte
+    return send_file(os.path.join(UPLOAD_FOLDER, filename), as_attachment=True, download_name=original)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
