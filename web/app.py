@@ -10,11 +10,10 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 VAULT_PATH = os.path.join(BASE_DIR, "secret.vault")
-CT_PATH = os.path.join(BASE_DIR, "ciphertext.bin")
 SEPARATOR = b"###VIVAR_PQC_DATA###"
 META_SEPARATOR = b"|||"
 
-# Definición alineada con Rust
+# Estructura alineada con el PqcVault de Rust
 class PqcVault(ctypes.Structure):
     _fields_ = [("ciphertext", ctypes.c_char * 1088),
                 ("encrypted_payload", ctypes.c_char * 2400)]
@@ -35,19 +34,13 @@ lib.vivar_pqc_process.argtypes = [
 def init_crypto():
     pk = ctypes.create_string_buffer(1184)
     sk = ctypes.create_string_buffer(2400)
-    ct = ctypes.create_string_buffer(1088)
     
     lib.generate_keys(pk, sk)
     
     vault = PqcVault()
     lib.seal_secret(pk, sk, ctypes.byref(vault))
     
-    # Escribir el vault completo (3488 bytes)
     with open(VAULT_PATH, "wb") as f: f.write(bytes(vault))
-    
-    # Generar CT original
-    lib.generate_ciphertext(pk, ct)
-    with open(CT_PATH, "wb") as f: f.write(ct.raw)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -63,14 +56,11 @@ def ocultar():
     secreto = bytearray(file_secreto.read())
     
     with open(VAULT_PATH, "rb") as f: vault_data = f.read()
-    with open(CT_PATH, "rb") as f: ct_data = f.read()
-    
-    # Usamos buffer seguro
     vault = PqcVault.from_buffer_copy(vault_data)
     
     lib.vivar_pqc_process(
         (ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto),
-        ctypes.c_char_p(ct_data), 1088,
+        vault.ciphertext, 1088,
         vault.encrypted_payload, 2400
     )
     
@@ -85,19 +75,16 @@ def extraer():
     if not os.path.exists(VAULT_PATH): return "Error: Sistema no inicializado", 500
     
     archivo_cargado = request.files['file_cargado'].read()
-    if SEPARATOR not in archivo_cargado: return "Archivo inválido", 400
-    
     partes = archivo_cargado.split(SEPARATOR, 1)
     meta, secreto_cifrado = partes[1].split(META_SEPARATOR, 1)
     secreto = bytearray(secreto_cifrado)
     
     with open(VAULT_PATH, "rb") as f: vault_data = f.read()
-    with open(CT_PATH, "rb") as f: ct_data = f.read()
-    
     vault = PqcVault.from_buffer_copy(vault_data)
+    
     lib.vivar_pqc_process(
         (ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto),
-        ctypes.c_char_p(ct_data), 1088,
+        vault.ciphertext, 1088,
         vault.encrypted_payload, 2400
     )
     
