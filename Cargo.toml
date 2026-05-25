@@ -3,33 +3,31 @@ name = "vivar-engine"
 version = "0.1.0"
 edition = "2021"
 
-# Configuración de compilación: Soporta tanto librerías dinámicas como WebAssembly
 [lib]
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [profile.release]
-opt-level = 3          # Máxima optimización para bucles ARX
-lto = "fat"            # LTO extremo para máxima velocidad de ejecución
-codegen-units = 1      # Unificación total del binario
-panic = "abort"        # Seguridad extrema: no revela trazas de memoria al fallar
-strip = true           # Binario compacto y sin símbolos (anti-ingeniería inversa)
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
 
 [dependencies]
-# Criptografía y Seguridad
+# Dependencias base
 zeroize = { version = "1.8", features = ["derive"] }
 pqcrypto-kyber = "0.7"
 pqcrypto-traits = "0.3"
 hkdf = "0.12"
 sha2 = "0.10"
 hmac = "0.12"
-subtle = "2.6"         # Crucial para evitar ataques de canal lateral (Timing Attacks)
+subtle = "2.6"
 
-# Soporte WebAssembly para la arquitectura Zero-Knowledge
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2"
+# Dependencia WASM declarada como opcional para evitar errores de compilación
+wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
-# Permite cambiar entre modo servidor (nativo) y modo cliente (wasm)
 default = []
+# Al activar el feature 'wasm', se habilita la dependencia wasm-bindgen
 wasm = ["dep:wasm-bindgen"]
