@@ -51,10 +51,8 @@ def ocultar():
     secret_key = open(SECRET_PATH, "rb").read()
     ciphertext = open(CT_PATH, "rb").read()
     
-    # 1. Ciframos SOLO los bytes del secreto
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
-    # 2. Empaquetamos nombre y datos cifrados
     payload = nombre_archivo + META_SEPARATOR + secreto
     
     filename_portador = secure_filename(request.files['file_portador'].filename)
@@ -72,7 +70,11 @@ def extraer():
     archivo_cargado = request.files['file_cargado'].read()
     if SEPARATOR not in archivo_cargado: return "Archivo inválido", 400
     
-    _, payload = archivo_cargado.split(SEPARATOR)
+    # 1. Usamos maxsplit=1 para evitar errores si el archivo contiene el separador
+    partes = archivo_cargado.split(SEPARATOR, 1)
+    payload = partes[1]
+    
+    # 2. Separamos el nombre del resto de datos con maxsplit=1
     nombre_original, secreto_cifrado = payload.split(META_SEPARATOR, 1)
     secreto = bytearray(secreto_cifrado)
     
