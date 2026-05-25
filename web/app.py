@@ -37,7 +37,7 @@ def index():
             try:
                 datos_portador = file_portador.read()
                 MARCADOR = b'VIVAR'
-
+                
                 if operacion == "cifrar":
                     file_secreto = request.files.get('file_secreto')
                     if not file_secreto: return render_template("index.html", step=2, error="Falta secreto.")
@@ -46,11 +46,14 @@ def index():
                     cabecera = MARCADOR + struct.pack('B', len(nombre_bytes)) + nombre_bytes
                     payload = sdk.process(file_secreto.read(), clave, offset=0)
                     
-                    ruta = os.path.join(UPLOAD_FOLDER, "MUTATED_" + file_portador.filename)
+                    # RUTA CORREGIDA: Usamos directamente el nombre del portador sin prefijo
+                    ruta = os.path.join(UPLOAD_FOLDER, file_portador.filename)
                     with open(ruta, "wb") as f:
                         f.write(datos_portador + cabecera + payload)
-                    return render_template("index.html", step=3, archivo_resultante=os.path.basename(ruta), nombre_descarga=file_portador.filename)
-                
+                    
+                    # RETORNO CORREGIDO: Usamos el nombre del portador para ambos campos
+                    return render_template("index.html", step=3, archivo_resultante=file_portador.filename, nombre_descarga=file_portador.filename)
+
                 elif operacion == "descifrar":
                     pos = datos_portador.find(MARCADOR)
                     if pos == -1: return render_template("index.html", step=2, error="No se encontró el marcador VIVAR.")
