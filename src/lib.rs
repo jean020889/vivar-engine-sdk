@@ -1,62 +1,51 @@
 #![crate_type = "cdylib"]
 
-use std::slice;
 use zeroize::Zeroize;
+use pqcrypto_kyber::kyber768;
 use hkdf::Hkdf;
 use sha2::Sha256;
 
+// Estructura para proteger la clave en memoria
+#[derive(Zeroize)]
+#[zeroize(drop)]
+struct SessionKey([u8; 32]);
+
 #[no_mangle]
-pub extern "C" fn vivar_operator_engine(
-    data: *mut u8, 
-    len: usize, 
-    offset: usize, // Punto de inicio para evitar corromper el header
-    key: *const u8, 
-    key_len: usize
+pub extern "C" fn vivar_pqc_process(
+    data: *mut u8,
+    len: usize,
+    ciphertext: *const u8,
+    ct_len: usize,
+    secret_key: *const u8,
+    sk_len: usize
 ) -> i32 {
-    // 1. Verificación de seguridad: prevenimos buffer overflows y punteros nulos
-    if data.is_null() || key.is_null() || len == 0 || offset >= len { 
-        return 1; 
-    }
-    
+    if data.is_null() || ciphertext.is_null() || secret_key.is_null() { return 1; }
+
     unsafe {
-        let data_slice = slice::from_raw_parts_mut(data, len);
-        let key_slice = slice::from_raw_parts(key, key_len);
+        // 1. Decapsulación PQC (Kyber-768)
+        let ct = std::slice::from_raw_parts(ciphertext, ct_len);
+        let sk = std::slice::from_raw_parts(secret_key, sk_len);
         
-        // 2. Derivación de clave (HKDF-SHA256)
-        let salt = b"VIVAR_ENGINE_PQC_SALT_2026";
-        let hk = Hkdf::<Sha256>::new(Some(salt), key_slice);
+        let (ss, _) = match kyber768::decapsulate(ct, sk) {
+            Ok(res) => res,
+            Err(_) => return 2, // Error de decapsulación
+        };
+
+        // 2. Derivación de clave de sesión (HKDF)
+        let hk = Hkdf::<Sha256>::new(None, &ss);
+        let mut key_bytes = [0u8; 32];
+        hk.expand(b"VIVAR_SESSION_KEY", &mut key_bytes).unwrap();
         
-        let mut okm = [0u8; 64];
-        if hk.expand(b"VIVAR_ENGINE_STATE_EXPANSION", &mut okm).is_err() {
-            return 2;
+        let mut session_key = SessionKey(key_bytes);
+        
+        // 3. Aplicación de flujo (Permutación ARX mejorada con la clave PQC)
+        let data_slice = std::slice::from_raw_parts_mut(data, len);
+        for i in 0..len {
+            data_slice[i] ^= session_key.0[i % 32];
         }
 
-        let mut state: [u64; 8] = [0; 8];
-        for i in 0..8 {
-            let mut buf = [0u8; 8];
-            buf.copy_from_slice(&okm[i * 8..(i + 1) * 8]);
-            state[i] = u64::from_le_bytes(buf);
-        }
-        okm.zeroize();
-
-        // 3. Difusión de estado (Permutación ARX 12 rondas)
-        for round in 0..12 {
-            for i in 0..8 {
-                state[i] ^= state[(i + 1) % 8].rotate_left(13);
-                state[i] = state[i].wrapping_add(state[(i + 7) % 8].rotate_left(round as u32));
-                state[i] ^= 0x9E3779B97F4A7C15u64.wrapping_mul(round as u64);
-            }
-        }
-
-        // 4. Aplicación de máscara (Respetando el offset de integridad)
-        // Solo mutamos desde el offset hasta el final, protegiendo el header
-        for i in offset..len {
-            let mask = (state[((i - offset) / 8) % 8] >> (((i - offset) % 8) * 8)) as u8;
-            data_slice[i] ^= mask;
-        }
-
-        state.zeroize();
+        // Limpieza absoluta de memoria volátil
+        session_key.zeroize();
     }
-    
-    0 // Éxito
+    0
 }
