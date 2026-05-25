@@ -1,4 +1,4 @@
-cat << 'EOF' > ~/vivar-engine-sdk/vivar_sdk.py
+
 import os
 import sys
 import ctypes
