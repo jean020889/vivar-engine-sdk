@@ -61,12 +61,15 @@ pub extern "C" fn seal_secret(pk_ptr: *const u8, sk_ptr: *const u8, vault_ptr: *
         let pk = match PublicKey::from_bytes(slice::from_raw_parts(pk_ptr, 1184)) {
             Ok(p) => p, Err(_) => return 1 
         };
+        
         let (ct, ss) = encapsulate(&pk);
         let sk_raw = slice::from_raw_parts(sk_ptr, SECRET_SIZE);
         let mut encrypted_sk = [0u8; SECRET_SIZE];
+        
         for i in 0..SECRET_SIZE {
             encrypted_sk[i] = sk_raw[i] ^ ss.as_bytes()[i % 32];
         }
+        
         let vault = &mut *vault_ptr;
         vault.ciphertext.copy_from_slice(ct.as_bytes());
         vault.encrypted_payload.copy_from_slice(&encrypted_sk);
@@ -90,6 +93,7 @@ pub extern "C" fn vivar_pqc_process(
         let ss = decapsulate(&ct, &sk);
         let hk = Hkdf::<Sha256>::new(None, ss.as_bytes());
         let mut raw_key = [0u8; 32];
+        
         if hk.expand(b"VIVAR_INDUSTRIAL_PQC_KEY_2026", &mut raw_key).is_err() { return 4; }
         
         let hardened_key = derive_hardened_key(&raw_key);
