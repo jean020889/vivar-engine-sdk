@@ -10,20 +10,23 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# --- FUNCIÓN DE BÚSQUEDA UNIVERSAL ---
+def find_file(filename, start_dir):
+    for root, dirs, files in os.walk(start_dir):
+        if filename in files:
+            return os.path.join(root, filename)
+    return None
+
 # --- 1. Detección Universal ---
 ext = ".so" if platform.system() != "Windows" else ".dll"
 lib_name = f"libvivar_engine{ext}"
 
-# Buscar librería en '..' o en el mismo dir
-lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', lib_name)
-if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, lib_name)
+# Escaneo automático
+lib_path = find_file(lib_name, os.path.join(BASE_DIR, '..')) or find_file(lib_name, BASE_DIR)
+key_path = find_file('keypair.bin', os.path.join(BASE_DIR, '..')) or find_file('keypair.bin', BASE_DIR)
 
-# Buscar keypair.bin en '..' o en el mismo dir
-key_path = os.path.join(BASE_DIR, '..', 'keypair.bin')
-if not os.path.exists(key_path): key_path = os.path.join(BASE_DIR, 'keypair.bin')
-
-if not os.path.exists(lib_path):
-    print(f"ERROR: No se encontró la librería en {lib_path}.")
+if not lib_path:
+    print(f"ERROR CRÍTICO: No se encontró {lib_name} en el sistema.")
     sys.exit(1)
 
 lib = ctypes.CDLL(lib_path)
@@ -51,11 +54,14 @@ def index():
             file_portador = request.files.get('file_portador')
             clave = request.form.get('clave', '')
             
-            if not os.path.exists(key_path):
-                return render_template("index.html", step=2, error=f"Error: keypair.bin no encontrado en {key_path}", clave=clave)
+            # Buscar el archivo si se movió o si la ruta cambió
+            current_key_path = find_file('keypair.bin', BASE_DIR)
+            
+            if not current_key_path:
+                return render_template("index.html", step=2, error="Error: keypair.bin no encontrado en ninguna carpeta.", clave=clave)
 
             try:
-                with open(key_path, "rb") as f:
+                with open(current_key_path, "rb") as f:
                     key_data = f.read()
                 
                 filename = secure_filename(file_portador.filename)
