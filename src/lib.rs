@@ -72,10 +72,10 @@ pub extern "C" fn seal_secret(pk_ptr: *const u8, sk_ptr: *const u8, vault_ptr: *
             encrypted_sk[i] = sk_raw[i] ^ ss.as_bytes()[i % 32];
         }
         
-        let vault = &mut *vault_ptr;
-        // Copia explícita y segura por rangos para evitar desbordamientos
-        vault.ciphertext[..KYBER_CT_SIZE].copy_from_slice(ct.as_bytes());
-        vault.encrypted_payload.copy_from_slice(&encrypted_sk);
+        // Copia directa de bajo nivel: ignora las comprobaciones de slices de Rust
+        // y escribe directamente en la memoria del PqcVault usando memcpy (ptr::copy_nonoverlapping)
+        std::ptr::copy_nonoverlapping(ct.as_bytes().as_ptr(), (*vault_ptr).ciphertext.as_mut_ptr(), KYBER_CT_SIZE);
+        std::ptr::copy_nonoverlapping(encrypted_sk.as_ptr(), (*vault_ptr).encrypted_payload.as_mut_ptr(), SECRET_SIZE);
     }
     0
 }
