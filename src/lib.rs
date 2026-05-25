@@ -4,10 +4,10 @@ use zeroize::Zeroize;
 use pqcrypto_kyber::kyber768::{keypair, encapsulate, decapsulate, Ciphertext, PublicKey, SecretKey};
 use pqcrypto_traits::kem::{Ciphertext as _, PublicKey as _, SecretKey as _, SharedSecret as _};
 use hkdf::Hkdf;
-use sha2::{Sha256, Digest}; // Asegúrate de tener Digest aquí
+use sha2::{Sha256, Digest};
 use std::slice;
 
-// --- MÓDULO VIVAR KERNEL (Integrado directamente) ---
+// --- MÓDULO VIVAR KERNEL ---
 const VIVAR_SPECTRAL_CONSTANT: [u8; 32] = [
     0x4A, 0x1B, 0x8C, 0x3D, 0x9E, 0x2F, 0x50, 0x61, 
     0x72, 0x83, 0x94, 0xA5, 0xB6, 0xC7, 0xD8, 0xE9,
@@ -35,7 +35,30 @@ fn derive_hardened_key(session_key_bytes: &[u8]) -> [u8; 32] {
 #[zeroize(drop)]
 struct SessionKey([u8; 32]);
 
-// ... [generate_keys y generate_ciphertext se mantienen igual] ...
+// --- FUNCIONES EXPORTADAS PARA PYTHON ---
+
+#[no_mangle]
+pub extern "C" fn generate_keys(pk_ptr: *mut u8, sk_ptr: *mut u8) {
+    let (pk, sk) = keypair();
+    unsafe {
+        std::ptr::copy_nonoverlapping(pk.as_bytes().as_ptr(), pk_ptr, 1184);
+        std::ptr::copy_nonoverlapping(sk.as_bytes().as_ptr(), sk_ptr, 2400);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn generate_ciphertext(pk_ptr: *const u8, ct_ptr: *mut u8) -> i32 {
+    let pk_bytes = unsafe { slice::from_raw_parts(pk_ptr, 1184) };
+    let pk = match PublicKey::from_bytes(pk_bytes) {
+        Ok(p) => p,
+        Err(_) => return 1,
+    };
+    let (ct, _) = encapsulate(&pk);
+    unsafe {
+        std::ptr::copy_nonoverlapping(ct.as_bytes().as_ptr(), ct_ptr, 1088);
+    }
+    0
+}
 
 #[no_mangle]
 pub extern "C" fn vivar_pqc_process(
@@ -54,21 +77,16 @@ pub extern "C" fn vivar_pqc_process(
         let ct = match Ciphertext::from_bytes(ct_bytes) { Ok(c) => c, Err(_) => return 2 };
         let sk = match SecretKey::from_bytes(sk_bytes) { Ok(s) => s, Err(_) => return 3 };
         
-        // 1. Decapsulación PQC
         let ss = decapsulate(&ct, &sk);
-        
-        // 2. Derivación inicial HKDF
         let hk = Hkdf::<Sha256>::new(None, ss.as_bytes());
         let mut raw_key = [0u8; 32];
+        
         if hk.expand(b"VIVAR_INDUSTRIAL_PQC_KEY_2026", &mut raw_key).is_err() { return 4; }
         
-        // 3. BLINDAJE CON OPERADOR VIVAR (Cálculo único, velocidad máxima)
         let hardened_key = derive_hardened_key(&raw_key);
         let mut session_key = SessionKey(hardened_key);
-        
         let data_slice = slice::from_raw_parts_mut(data, len);
         
-        // 4. Bucle de cifrado (El Operador ya está integrado en la key)
         for i in 0..len {
             let key_byte = session_key.0[i % 32];
             let mut val = (i as u64) ^ 0x5A5A5A5A5A5A5A5A;
