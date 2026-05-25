@@ -52,7 +52,7 @@
     <form method="POST" 
           action="{{ '/ocultar' if operacion == 'cifrar' else '/extraer' }}" 
           enctype="multipart/form-data" 
-          onsubmit="this.querySelector('button').style.display='none'; document.getElementById('prog').style.display='block';">
+          onsubmit="document.getElementById('btn-submit').style.display='none'; document.getElementById('prog').style.display='block';">
 
         {% if operacion == "cifrar" %}
         <div class="file-box">
@@ -70,7 +70,7 @@
         </div>
         {% endif %}
 
-        <button type="submit" class="btn-action">Ejecutar Proceso</button>
+        <button type="submit" id="btn-submit" class="btn-action">Ejecutar Proceso</button>
         
         <div id="prog" class="progress-container">
             <div class="progress-bar"><div class="progress-fill"></div></div>
