@@ -58,8 +58,10 @@ pub extern "C" fn generate_keys(pk_ptr: *mut u8, sk_ptr: *mut u8) {
 #[no_mangle]
 pub extern "C" fn seal_secret(pk_ptr: *const u8, sk_ptr: *const u8, vault_ptr: *mut PqcVault) -> i32 {
     unsafe {
+        if pk_ptr.is_null() || sk_ptr.is_null() || vault_ptr.is_null() { return 1; }
+        
         let pk = match PublicKey::from_bytes(slice::from_raw_parts(pk_ptr, 1184)) {
-            Ok(p) => p, Err(_) => return 1 
+            Ok(p) => p, Err(_) => return 2 
         };
         
         let (ct, ss) = encapsulate(&pk);
@@ -71,7 +73,8 @@ pub extern "C" fn seal_secret(pk_ptr: *const u8, sk_ptr: *const u8, vault_ptr: *
         }
         
         let vault = &mut *vault_ptr;
-        vault.ciphertext.copy_from_slice(ct.as_bytes());
+        // Copia explícita y segura por rangos para evitar desbordamientos
+        vault.ciphertext[..KYBER_CT_SIZE].copy_from_slice(ct.as_bytes());
         vault.encrypted_payload.copy_from_slice(&encrypted_sk);
     }
     0
