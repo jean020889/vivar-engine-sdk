@@ -6,21 +6,21 @@ from flask import Flask, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-# Rutas relativas al directorio del script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- 1. Detección Universal de Librería ---
-# Determina la extensión según el SO
+# --- 1. Detección Universal ---
 ext = ".so" if platform.system() != "Windows" else ".dll"
 lib_name = f"libvivar_engine{ext}"
-lib_path = os.path.abspath(os.path.join(BASE_DIR, '..', 'target', 'release', lib_name))
-key_path = os.path.abspath(os.path.join(BASE_DIR, '..', 'keypair.bin'))
 
-if not os.path.exists(lib_path):
-    # Intentamos buscar en el mismo directorio si no está en target/release
-    lib_path = os.path.join(BASE_DIR, lib_name)
+# Buscar librería en '..' o en el mismo dir
+lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', lib_name)
+if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, lib_name)
+
+# Buscar keypair.bin en '..' o en el mismo dir
+key_path = os.path.join(BASE_DIR, '..', 'keypair.bin')
+if not os.path.exists(key_path): key_path = os.path.join(BASE_DIR, 'keypair.bin')
 
 if not os.path.exists(lib_path):
     print(f"ERROR: No se encontró la librería en {lib_path}.")
@@ -52,7 +52,7 @@ def index():
             clave = request.form.get('clave', '')
             
             if not os.path.exists(key_path):
-                return render_template("index.html", step=2, error="Error: keypair.bin no encontrado.", clave=clave)
+                return render_template("index.html", step=2, error=f"Error: keypair.bin no encontrado en {key_path}", clave=clave)
 
             try:
                 with open(key_path, "rb") as f:
@@ -75,7 +75,6 @@ def index():
                     return render_template("index.html", step=3, archivo_resultante=filename)
                 else:
                     return render_template("index.html", step=2, error=f"Error PQC (Status: {status})", clave=clave)
-                    
             except Exception as e:
                 return render_template("index.html", step=2, error=str(e), clave=clave)
                 
