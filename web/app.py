@@ -8,8 +8,10 @@ UPLOAD_FOLDER = 'temp_uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # --- 1. Carga Segura del Motor PQC ---
-lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'target', 'release', 'libvivar_engine.so'))
-key_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'keypair.bin'))
+# Rutas absolutas fijas para evitar errores de directorio de trabajo
+BASE_DIR = "/data/data/com.termux/files/home/vivar-engine-sdk"
+lib_path = os.path.join(BASE_DIR, "target/release/libvivar_engine.so")
+key_path = os.path.join(BASE_DIR, "keypair.bin")
 
 if not os.path.exists(lib_path):
     print(f"ERROR: No se encontró la librería en {lib_path}.")
@@ -41,7 +43,7 @@ def index():
             clave = request.form.get('clave', '')
             
             if not os.path.exists(key_path):
-                return render_template("index.html", step=2, error="Error: keypair.bin no encontrado.", clave=clave)
+                return render_template("index.html", step=2, error=f"Error: {key_path} no encontrado.", clave=clave)
 
             try:
                 with open(key_path, "rb") as f:
@@ -50,7 +52,6 @@ def index():
                 filename = secure_filename(file_portador.filename)
                 portador_data = bytearray(file_portador.read())
                 
-                # Ejecución PQC usando los bytes de la clave real
                 status = lib.vivar_pqc_process(
                     (ctypes.c_char * len(portador_data)).from_buffer(portador_data),
                     len(portador_data),
