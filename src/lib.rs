@@ -34,6 +34,14 @@ pub extern "C" fn generate_ciphertext(pk_ptr: *const u8, ct_ptr: *mut u8) -> i32
     0
 }
 
+
+#[no_mangle]
+pub extern "C" fn get_version() -> i32 {
+    // Retorna un entero (ej: 100 para v1.0.0, 101 para v1.0.1)
+    100 
+}
+
+
 #[no_mangle]
 pub extern "C" fn vivar_pqc_process(
     data: *mut u8, len: usize,
