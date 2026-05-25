@@ -51,9 +51,10 @@ def ocultar():
     secret_key = open(SECRET_PATH, "rb").read()
     ciphertext = open(CT_PATH, "rb").read()
     
+    # 1. Ciframos SOLO los bytes del secreto
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
-    # Empaquetamos: Nombre + Meta Separador + Datos
+    # 2. Empaquetamos nombre y datos cifrados
     payload = nombre_archivo + META_SEPARATOR + secreto
     
     filename_portador = secure_filename(request.files['file_portador'].filename)
@@ -78,6 +79,7 @@ def extraer():
     secret_key = open(SECRET_PATH, "rb").read()
     ciphertext = open(CT_PATH, "rb").read()
     
+    # 3. Procesamos SOLO los datos cifrados
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
     ruta_out = os.path.join(UPLOAD_FOLDER, nombre_original.decode())
