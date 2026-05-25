@@ -1,6 +1,13 @@
 import os
+import sys
+
+# --- PARCHE DE RUTA: Esto le dice a Python que busque en la raíz del proyecto ---
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from flask import Flask, render_template, request, send_file
 from vivar_sdk import VivarEngineSDK
+# ... resto de tu código ...
+
 
 app = Flask(__name__)
 BASE_DIR = os.path.expanduser("~/vivar-engine-sdk/web")
