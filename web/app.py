@@ -1,9 +1,7 @@
-
 import os
 import sys
 import json
 import hashlib
-import secrets
 from flask import Flask, render_template, request, Response, redirect, url_for, stream_with_context
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,13 +19,13 @@ try:
 except:
     sdk = None
 
-def generar_firma_vivar(clave_texto):
-    """Deriva la firma exacta usando la lógica del sistema original v9.9.5"""
+def generar_firma_estatica(clave_texto):
+    """Deriva la firma de alineación geométrica basada en tu clave de seguridad"""
     salt = b"VIVAR_PRO_2026_ESTATAL_777"
     derived = hashlib.pbkdf2_hmac('sha512', clave_texto.encode(), salt, 1200000, 64)
     kh = hashlib.sha512(derived + salt).digest()
     sig = hashlib.sha256(kh + b"SIG942").digest()[:16]
-    return kh, sig
+    return sig
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -62,9 +60,8 @@ def index():
                 return render_template("index.html", step=2, clave=clave, operacion=operacion, error=error)
 
             try:
-                # Ejecutar KDF ultra e inmunidad de firmas de Jean Carlos
-                kh, sig = generar_firma_vivar(clave)
-                clave_bytes = clave.encode("utf-8") # Para compatibilidad con el Core actual
+                sig = generar_firma_estatica(clave)
+                clave_bytes = clave.encode("utf-8")
                 
                 if operacion == "cifrar":
                     path_secreto = os.path.join(app.config['UPLOAD_FOLDER'], file_secreto.filename)
@@ -76,30 +73,29 @@ def index():
                     with open(path_secreto, "rb") as f:
                         datos_secreto = f.read()
                     
-                    # Cifrado con el núcleo actual
+                    # 1. Cifrado nativo puro con el Core de Rust (Aislado de metadatos)
                     secreto_cifrado = sdk.process(datos_secreto, clave_bytes)
 
                     with open(path_portador, "rb") as f:
                         datos_portador = f.read()
 
-                    # Reconstrucción del empaquetado nativo v9.9.5
+                    # 2. Empaquetado lineal milimétrico
                     meta = json.dumps({"filename": file_secreto.filename}).encode('utf-8')
-                    # Estructura interna: longitud_meta(4B) + meta + secreto_cifrado
-                    cuerpo_secreto = bytearray(len(meta).to_bytes(4, 'big') + meta + secreto_cifrado)
                     
-                    # Inyección de dispersión estocástica para robustez
-                    cuerpo_secreto += secrets.token_bytes(secrets.randbelow(512))
-                    s_len_h = len(cuerpo_secreto).to_bytes(4, 'big')
+                    tam_secreto_bytes = len(secreto_cifrado).to_bytes(4, byteorder="big")
+                    tam_meta_bytes = len(meta).to_bytes(4, byteorder="big")
                     
                     output_filename = "output_" + file_portador.filename
                     output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
                     
-                    # Ensamble final idéntico a tu software exitoso
+                    # Estructura limpia: [PORTADOR] + [FIRMA] + [CIFRADO] + [META] + [TAM_META] + [TAM_SECRETO]
                     with open(output_path, "wb") as f:
                         f.write(datos_portador)
                         f.write(sig)
-                        f.write(s_len_h)
-                        f.write(cuerpo_secreto)
+                        f.write(secreto_cifrado)
+                        f.write(meta)
+                        f.write(tam_meta_bytes)
+                        f.write(tam_secreto_bytes)
 
                     os.remove(path_secreto)
                     os.remove(path_portador)
@@ -113,30 +109,33 @@ def index():
                     with open(path_portador, "rb") as f:
                         datos_totales = f.read()
 
-                    # BÚSQUEDA DINÁMICA POR FIRMA GEOMÉTRICA (Evita fallos por bloqueos de Android)
+                    # BÚSQUEDA DINÁMICA DE LA ALINEACIÓN POR FIRMA GEOMÉTRICA
                     idx = datos_totales.find(sig)
                     if idx == -1:
                         os.remove(path_portador)
                         error = "Alineación defectuosa: Firma no encontrada o clave incorrecta."
                         return render_template("index.html", step=2, clave=clave, operacion=operacion, error=error)
 
-                    l_idx = idx + 16
-                    s_len = int.from_bytes(datos_totales[l_idx:l_idx+4], 'big')
+                    # Extraer las longitudes estrictas desde los últimos 8 bytes del archivo total
+                    # Evitamos desfases leyendo de atrás hacia adelante con respecto al final del bloque
+                    fin_bloque = len(datos_totales)
+                    tam_secreto = int.from_bytes(datos_totales[fin_bloque-4:fin_bloque], byteorder="big")
+                    tam_meta = int.from_bytes(datos_totales[fin_bloque-8:fin_bloque-4], byteorder="big")
                     
-                    # Extracción exacta aislada del ruido de red
-                    cuerpo_extraido = datos_totales[l_idx+4 : l_idx+4+s_len]
+                    # Delimitar las zonas exactas basadas en el punto de inicio de la firma
+                    ini_secreto = idx + 16
+                    fin_secreto = ini_secreto + tam_secreto
+                    ini_meta = fin_secreto
+                    fin_meta = ini_meta + tam_meta
                     
-                    # Extraer metadatos según el orden original
-                    m_len = int.from_bytes(cuerpo_extraido[:4], 'big')
-                    meta_data = json.loads(cuerpo_extraido[4:4+m_len].decode('utf-8'))
+                    # Extracción exacta de bytes
+                    secreto_cifrado_puro = datos_totales[ini_secreto:fin_secreto]
+                    meta_bytes = datos_totales[ini_meta:fin_meta]
+                    
+                    meta_data = json.loads(meta_bytes.decode('utf-8'))
                     nombre_original = meta_data.get("filename", "recuperado.pdf")
                     
-                    secreto_cifrado_puro = cuerpo_extraido[4+m_len:]
-                    
-                    # Como añadimos token_bytes al final en el cifrado, debemos limpiar el padding sobrante para Rust.
-                    # El Core de Rust espera bloques exactos o sabe su tamaño. 
-                    # Si tu sdk.decrypt maneja el tamaño exacto del cifrado original:
-                    # En tu v9.9.5 pasabas todo el bloque porque Rust leía por chunks, aquí hacemos el decrypt nativo:
+                    # Descifrado nativo sin colas ni padding corrupto
                     secreto_original = sdk.decrypt(bytes(secreto_cifrado_puro), clave_bytes)
 
                     output_path = os.path.join(app.config['UPLOAD_FOLDER'], nombre_original)
@@ -148,7 +147,7 @@ def index():
                     return render_template("index.html", step=3, archivo_resultante=nombre_original, nombre_descarga=nombre_original)
 
             except Exception as e:
-                error = f"Fallo de Sincronización en Core: {str(e)}"
+                error = f"Error en alineación de punteros: {str(e)}"
                 return render_template("index.html", step=2, clave=clave, operacion=operacion, error=error)
 
     return render_template("index.html", step=step, clave=clave, operacion=operacion, archivo_resultante=archivo_resultante, nombre_descarga=nombre_descarga, error=error)
@@ -176,3 +175,4 @@ def download(filename, download_name):
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
 EOF
+
