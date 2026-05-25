@@ -1,7 +1,7 @@
 import os
 import ctypes
 import platform
-from flask import Flask, render_template, request, send_file, redirect, url_for
+from flask import Flask, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -19,7 +19,18 @@ lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{e
 if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
 
 lib = ctypes.CDLL(lib_path)
+lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+lib.generate_ciphertext.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.vivar_pqc_process.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
+
+def init_crypto():
+    pk = ctypes.create_string_buffer(1184)
+    sk = ctypes.create_string_buffer(2400)
+    ct = ctypes.create_string_buffer(1088)
+    lib.generate_keys(pk, sk)
+    lib.generate_ciphertext(pk, ct)
+    with open(SECRET_PATH, "wb") as f: f.write(sk.raw)
+    with open(CT_PATH, "wb") as f: f.write(ct.raw)
 
 # --- RUTAS ---
 @app.route("/", methods=["GET", "POST"])
@@ -31,6 +42,7 @@ def index():
 
 @app.route("/ocultar", methods=["POST"])
 def ocultar():
+    if not os.path.exists(SECRET_PATH): init_crypto()
     portador = request.files['file_portador'].read()
     secreto = bytearray(request.files['file_secreto'].read())
     
@@ -41,14 +53,13 @@ def ocultar():
     
     ruta = os.path.join(UPLOAD_FOLDER, secure_filename(request.files['file_portador'].filename))
     with open(ruta, "wb") as f: f.write(portador + SEPARATOR + secreto)
-    
-    # Se fuerza la descarga y el navegador debería gestionar el cierre de la carga
     return send_file(ruta, as_attachment=True)
 
 @app.route("/extraer", methods=["POST"])
 def extraer():
+    if not os.path.exists(SECRET_PATH): init_crypto()
     archivo_cargado = request.files['file_cargado'].read()
-    if SEPARATOR not in archivo_cargado: return "Archivo inválido: No se detectó firma Vivar PQC", 400
+    if SEPARATOR not in archivo_cargado: return "Archivo inválido", 400
     
     _, secreto_cifrado = archivo_cargado.split(SEPARATOR)
     secreto = bytearray(secreto_cifrado)
