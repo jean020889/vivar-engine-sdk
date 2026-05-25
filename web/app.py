@@ -1,7 +1,7 @@
 import os
 import ctypes
 import platform
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, redirect, url_for
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -40,9 +40,11 @@ def index():
         return render_template("index.html", step=2, clave=request.form.get("clave"), operacion=request.form.get("operacion"))
     return render_template("index.html", step=1)
 
-@app.route("/ocultar", methods=["POST"])
+@app.route("/ocultar", methods=["GET", "POST"])
 def ocultar():
+    if request.method == "GET": return redirect(url_for('index'))
     if not os.path.exists(SECRET_PATH): init_crypto()
+    
     portador = request.files['file_portador'].read()
     secreto = bytearray(request.files['file_secreto'].read())
     
@@ -55,9 +57,11 @@ def ocultar():
     with open(ruta, "wb") as f: f.write(portador + SEPARATOR + secreto)
     return send_file(ruta, as_attachment=True)
 
-@app.route("/extraer", methods=["POST"])
+@app.route("/extraer", methods=["GET", "POST"])
 def extraer():
+    if request.method == "GET": return redirect(url_for('index'))
     if not os.path.exists(SECRET_PATH): init_crypto()
+    
     archivo_cargado = request.files['file_cargado'].read()
     if SEPARATOR not in archivo_cargado: return "Archivo inválido", 400
     
