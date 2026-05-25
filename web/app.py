@@ -1,8 +1,8 @@
 import os
 import sys
-import shutil
+import struct
 
-# Ruta del SDK
+# Mapeo de rutas
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from flask import Flask, render_template, request, send_file
@@ -10,8 +10,6 @@ from vivar_sdk import VivarEngineSDK
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'temp_uploads'
-# Ruta de almacenamiento de Android (para Termux)
-ANDROID_DOWNLOADS = os.path.expanduser("~/storage/downloads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 sdk = VivarEngineSDK(lib_path='../target/release/libvivar_engine.so')
@@ -28,47 +26,48 @@ def index():
             clave = request.form.get("clave").encode()
             operacion = request.form.get("operacion")
             file_portador = request.files.get("file_portador")
-            nombre_orig = file_portador.filename
             
             try:
-                datos = file_portador.read()
-                
+                datos_portador = file_portador.read()
+                nombre_g = "PROCESADO_" + file_portador.filename
+                ruta_servidor = os.path.join(UPLOAD_FOLDER, nombre_g)
+
                 if operacion == "cifrar":
                     datos_secreto = request.files.get("file_secreto").read()
-                    res = sdk.process(datos_secreto, clave)
-                    nombre_g = "MUTATED_" + nombre_orig
+                    # El SDK aplica la lógica de delimitador y longitud
+                    payload = sdk.process(datos_secreto, clave)
                     
-                    # 1. Guardar solo en servidor para la web
-                    ruta_servidor = os.path.join(UPLOAD_FOLDER, nombre_g)
-                    with open(ruta_servidor, "wb") as f: f.write(datos + res)
-                    
-                    # 2. Copiar a Termux/Android Downloads (Opcional si quieres copia local)
-                    if os.path.exists(ANDROID_DOWNLOADS):
-                        shutil.copy2(ruta_servidor, os.path.join(ANDROID_DOWNLOADS, nombre_g))
+                    with open(ruta_servidor, "wb") as f:
+                        f.write(datos_portador + payload)
                         
-                    return render_template("index.html", step=3, archivo_resultante=nombre_g, nombre_descarga=nombre_orig)
+                    return render_template("index.html", step=3, 
+                                           archivo_resultante=nombre_g, 
+                                           nombre_descarga=file_portador.filename)
                 
                 else: # Descifrar
-                    res = sdk.decrypt(datos, clave)
-                    nombre_g = "RECUPERADO_" + nombre_orig
+                    # El SDK busca el delimitador y extrae solo el PDF íntegro
+                    resultado = sdk.decrypt(datos_portador, clave)
+                    nombre_pdf = "EXTRAIDO_" + file_portador.filename.replace(".mp4", ".pdf").replace(".avi", ".pdf")
+                    ruta_pdf = os.path.join(UPLOAD_FOLDER, nombre_pdf)
                     
-                    # Guardar archivo para la web
-                    ruta_servidor = os.path.join(UPLOAD_FOLDER, nombre_g)
-                    with open(ruta_servidor, "wb") as f: f.write(res)
-                    
-                    # Copiar a Termux/Android Downloads automáticamente
-                    if os.path.exists(ANDROID_DOWNLOADS):
-                        shutil.copy2(ruta_servidor, os.path.join(ANDROID_DOWNLOADS, nombre_orig))
+                    with open(ruta_pdf, "wb") as f:
+                        f.write(resultado)
                         
-                    return render_template("index.html", step=3, archivo_resultante=nombre_g, nombre_descarga=nombre_orig)
+                    return render_template("index.html", step=3, 
+                                           archivo_resultante=nombre_pdf, 
+                                           nombre_descarga="documento_secreto.pdf")
             
             except Exception as e:
                 return render_template("index.html", step=1, error=str(e))
+                
     return render_template("index.html", step=1)
 
 @app.route("/download/<path:filename>/<original_name>")
 def download(filename, original_name):
-    return send_file(os.path.join(UPLOAD_FOLDER, filename), as_attachment=True, download_name=original_name)
+    return send_file(os.path.join(UPLOAD_FOLDER, filename), 
+                     as_attachment=True, 
+                     download_name=original_name,
+                     mimetype='application/octet-stream')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
