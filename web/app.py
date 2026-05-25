@@ -1,7 +1,13 @@
 import os
 import sys
+
+# Esto le dice a Python: "Busca módulos también en la carpeta padre (donde está vivar_sdk.py)"
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from flask import Flask, render_template, request, send_file
-from vivar_sdk import VivarEngineSDK
+# Ahora Python sabrá encontrar vivar_sdk
+from vivar_sdk import VivarEngineSDK 
+
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'temp_uploads'
