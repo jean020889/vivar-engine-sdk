@@ -1,5 +1,4 @@
 import os
-import sys
 import ctypes
 import platform
 from flask import Flask, render_template, request, send_file
@@ -10,76 +9,77 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# MARCADOR DE SEGURIDAD PARA ESTRUCTURA
+SEPARATOR = b"###VIVAR_PQC_DATA###"
+
 # --- 1. CONFIGURACIÓN DEL MOTOR ---
 ext = ".so" if platform.system() != "Windows" else ".dll"
 lib_name = f"libvivar_engine{ext}"
 lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', lib_name)
 if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, lib_name)
 
-if not os.path.exists(lib_path):
-    print(f"ERROR: Librería {lib_name} no encontrada.")
-    sys.exit(1)
-
 lib = ctypes.CDLL(lib_path)
 lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.generate_ciphertext.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-lib.generate_ciphertext.restype = ctypes.c_int
 lib.vivar_pqc_process.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
-lib.vivar_pqc_process.restype = ctypes.c_int
 
-# --- 2. INICIALIZACIÓN DE CLAVES REALES ---
+# --- 2. INICIALIZACIÓN ---
 def init_crypto():
     pk = ctypes.create_string_buffer(1184)
     sk = ctypes.create_string_buffer(2400)
     ct = ctypes.create_string_buffer(1088)
-    
     lib.generate_keys(pk, sk)
-    with open("secret.bin", "wb") as f: f.write(sk.raw)
-    
     lib.generate_ciphertext(pk, ct)
+    with open("secret.bin", "wb") as f: f.write(sk.raw)
     with open("ciphertext.bin", "wb") as f: f.write(ct.raw)
 
-if not os.path.exists("secret.bin") or not os.path.exists("ciphertext.bin"):
-    init_crypto()
+if not os.path.exists("secret.bin"): init_crypto()
 
 # --- 3. LÓGICA DE NEGOCIO ---
-@app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["POST"])
 def index():
-    if request.method == "POST":
-        action = request.form.get("action")
+    # Acción: OCULTAR
+    if request.form.get("action") == "ocultar":
+        portador = request.files['file_portador'].read()
+        secreto = bytearray(request.files['file_secreto'].read())
         
-        if action == "validar_clave":
-            return render_template("index.html", step=2, clave=request.form.get("clave"))
+        secret_key = open("secret.bin", "rb").read()
+        ciphertext = open("ciphertext.bin", "rb").read()
+        
+        # Ciframos solo el secreto
+        lib.vivar_pqc_process(
+            (ctypes.c_char * len(secreto)).from_buffer(secreto),
+            len(secreto), ciphertext, 1088, secret_key, 2400
+        )
+        
+        # Combinamos: Portador + Marcador + Secreto Cifrado
+        archivo_final = portador + SEPARATOR + secreto
+        
+        ruta = os.path.join(UPLOAD_FOLDER, secure_filename(request.files['file_portador'].filename))
+        with open(ruta, "wb") as f: f.write(archivo_final)
+        return send_file(ruta, as_attachment=True)
 
-        if action == "ejecutar_stego":
-            file_portador = request.files.get('file_portador')
+    # Acción: EXTRAER
+    if request.form.get("action") == "extraer":
+        archivo_cargado = request.files['file_cargado'].read()
+        if SEPARATOR in archivo_cargado:
+            _, secreto_cifrado = archivo_cargado.split(SEPARATOR)
+            secreto = bytearray(secreto_cifrado)
             
-            try:
-                secret_key = open("secret.bin", "rb").read()
-                ciphertext = open("ciphertext.bin", "rb").read()
-                portador_data = bytearray(file_portador.read())
-                
-                status = lib.vivar_pqc_process(
-                    (ctypes.c_char * len(portador_data)).from_buffer(portador_data),
-                    len(portador_data),
-                    ciphertext, 1088,
-                    secret_key, 2400
-                )
-                
-                if status == 0:
-                    ruta = os.path.join(UPLOAD_FOLDER, secure_filename(file_portador.filename))
-                    with open(ruta, "wb") as f: f.write(portador_data)
-                    return render_template("index.html", step=3, archivo_resultante=file_portador.filename)
-                else:
-                    return render_template("index.html", step=2, error=f"Error PQC (Status: {status})")
-            except Exception as e:
-                return render_template("index.html", step=2, error=str(e))
-                
-    return render_template("index.html", step=1)
+            secret_key = open("secret.bin", "rb").read()
+            ciphertext = open("ciphertext.bin", "rb").read()
+            
+            # Desciframos (el motor XOR es reversible)
+            lib.vivar_pqc_process(
+                (ctypes.c_char * len(secreto)).from_buffer(secreto),
+                len(secreto), ciphertext, 1088, secret_key, 2400
+            )
+            
+            ruta_out = os.path.join(UPLOAD_FOLDER, "secreto_recuperado")
+            with open(ruta_out, "wb") as f: f.write(secreto)
+            return send_file(ruta_out, as_attachment=True)
 
-@app.route("/download/<filename>")
-def download(filename):
-    return send_file(os.path.join(UPLOAD_FOLDER, secure_filename(filename)), as_attachment=True)
+    return "Acción inválida", 400
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
