@@ -1,21 +1,30 @@
 import os
+import sys
 import ctypes
+import platform
 from flask import Flask, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'temp_uploads'
+# Rutas relativas al directorio del script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- 1. Carga Segura del Motor PQC ---
-# Rutas absolutas fijas para evitar errores de directorio de trabajo
-BASE_DIR = "/data/data/com.termux/files/home/vivar-engine-sdk"
-lib_path = os.path.join(BASE_DIR, "target/release/libvivar_engine.so")
-key_path = os.path.join(BASE_DIR, "keypair.bin")
+# --- 1. Detección Universal de Librería ---
+# Determina la extensión según el SO
+ext = ".so" if platform.system() != "Windows" else ".dll"
+lib_name = f"libvivar_engine{ext}"
+lib_path = os.path.abspath(os.path.join(BASE_DIR, '..', 'target', 'release', lib_name))
+key_path = os.path.abspath(os.path.join(BASE_DIR, '..', 'keypair.bin'))
+
+if not os.path.exists(lib_path):
+    # Intentamos buscar en el mismo directorio si no está en target/release
+    lib_path = os.path.join(BASE_DIR, lib_name)
 
 if not os.path.exists(lib_path):
     print(f"ERROR: No se encontró la librería en {lib_path}.")
-    exit(1)
+    sys.exit(1)
 
 lib = ctypes.CDLL(lib_path)
 lib.vivar_pqc_process.argtypes = [
@@ -43,7 +52,7 @@ def index():
             clave = request.form.get('clave', '')
             
             if not os.path.exists(key_path):
-                return render_template("index.html", step=2, error=f"Error: {key_path} no encontrado.", clave=clave)
+                return render_template("index.html", step=2, error="Error: keypair.bin no encontrado.", clave=clave)
 
             try:
                 with open(key_path, "rb") as f:
