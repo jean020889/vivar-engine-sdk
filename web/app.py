@@ -16,7 +16,6 @@ META_SEPARATOR = b"|||"
 
 # --- CONFIGURACIÓN MOTOR ---
 ext = ".so" if platform.system() != "Windows" else ".dll"
-# Buscamos en la ruta absoluta correcta según tu estructura
 lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{ext}")
 if not os.path.exists(lib_path): 
     lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
@@ -24,6 +23,8 @@ if not os.path.exists(lib_path):
 lib = ctypes.CDLL(lib_path)
 
 # Definición de tipos de datos para la interfaz C
+lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+lib.generate_ciphertext.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.vivar_pqc_process.argtypes = [
     ctypes.POINTER(ctypes.c_char), 
     ctypes.c_size_t,               
@@ -63,7 +64,6 @@ def ocultar():
     secret_key = open(SECRET_PATH, "rb").read()
     ciphertext = open(CT_PATH, "rb").read()
     
-    # Llamada al motor con conversión a punteros c_char
     lib.vivar_pqc_process(
         (ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto),
         ctypes.c_char_p(ciphertext), 1088,
