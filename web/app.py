@@ -1,7 +1,7 @@
 import os
 import ctypes
 import platform
-from flask import Flask, render_template, request, send_file, redirect, url_for
+from flask import Flask, render_template, request, send_file, redirect, url_for, make_response
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -19,6 +19,8 @@ lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{e
 if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
 
 lib = ctypes.CDLL(lib_path)
+lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+lib.generate_ciphertext.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.vivar_pqc_process.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
 
 def init_crypto():
@@ -54,7 +56,9 @@ def ocultar():
     ruta = os.path.join(UPLOAD_FOLDER, filename)
     with open(ruta, "wb") as f: f.write(portador + SEPARATOR + secreto)
     
-    return send_file(ruta, as_attachment=True, download_name=filename, mimetype="application/octet-stream")
+    response = make_response(send_file(ruta, mimetype="application/octet-stream"))
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    return response
 
 @app.route("/extraer", methods=["POST"])
 def extraer():
@@ -74,7 +78,9 @@ def extraer():
     ruta_out = os.path.join(UPLOAD_FOLDER, "secreto_recuperado.bin")
     with open(ruta_out, "wb") as f: f.write(secreto)
     
-    return send_file(ruta_out, as_attachment=True, download_name="secreto_recuperado.bin", mimetype="application/octet-stream")
+    response = make_response(send_file(ruta_out, mimetype="application/octet-stream"))
+    response.headers["Content-Disposition"] = "attachment; filename=secreto_recuperado.bin"
+    return response
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
