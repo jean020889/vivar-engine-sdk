@@ -8,6 +8,7 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'temp_uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Configuración del SDK
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 try:
     from vivar_sdk import VivarEngineSDK
@@ -17,40 +18,51 @@ except Exception as e:
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    # Estado inicial por defecto
+    context = {"step": 1, "clave": "", "operacion": "", "error": None}
+
     if request.method == "POST":
         action = request.form.get("action")
         
-        if action == "ejecutar_stego":
+        # Paso 1 -> 2: Recibir credenciales y operación
+        if action == "iniciar_proceso":
+            context["step"] = 2
+            context["clave"] = request.form.get("clave")
+            context["operacion"] = request.form.get("operacion")
+            return render_template("index.html", **context)
+
+        # Paso 2 -> 3: Ejecución de esteganografía
+        elif action == "ejecutar_stego":
             clave = request.form.get("clave", "").encode()
             operacion = request.form.get("operacion")
             file_portador = request.files.get('file_portador')
             
             if not file_portador or not sdk:
-                return render_template("index.html", step=2, error="Error de carga.")
+                return render_template("index.html", step=2, error="Faltan archivos o SDK no disponible.")
 
-            # FORZAMOS EL NOMBRE ORIGINAL AQUÍ
-            nombre_final = file_portador.filename
-            
+            nombre_original = file_portador.filename
+            datos_portador = file_portador.read()
+            MARCADOR = b'VIVAR'
+
             try:
-                datos_portador = file_portador.read()
-                MARCADOR = b'VIVAR'
-                
                 if operacion == "cifrar":
                     file_secreto = request.files.get('file_secreto')
+                    if not file_secreto: return render_template("index.html", step=2, error="Falta secreto.")
+                    
                     nombre_secreto = file_secreto.filename.encode('utf-8')
                     cabecera = MARCADOR + struct.pack('B', len(nombre_secreto)) + nombre_secreto
                     payload = sdk.process(file_secreto.read(), clave, offset=0)
                     
-                    # Guardar usando estrictamente el nombre original del portador
-                    ruta = os.path.join(UPLOAD_FOLDER, nombre_final)
+                    # Escritura forzando el nombre original
+                    ruta = os.path.join(UPLOAD_FOLDER, nombre_original)
                     with open(ruta, "wb") as f:
                         f.write(datos_portador + cabecera + payload)
                     
-                    return render_template("index.html", step=3, archivo_resultante=nombre_final, nombre_descarga=nombre_final)
+                    return render_template("index.html", step=3, archivo_resultante=nombre_original, nombre_descarga=nombre_original)
 
                 elif operacion == "descifrar":
                     pos = datos_portador.find(MARCADOR)
-                    if pos == -1: return render_template("index.html", step=2, error="Marcador no encontrado.")
+                    if pos == -1: return render_template("index.html", step=2, error="No se encontró contenido oculto.")
                     
                     inicio_nombre = pos + len(MARCADOR)
                     longitud_nombre = datos_portador[inicio_nombre]
@@ -63,10 +75,11 @@ def index():
                     with open(ruta, "wb") as f: f.write(res)
                     
                     return render_template("index.html", step=3, archivo_resultante=nombre_recuperado, nombre_descarga=nombre_recuperado)
+
             except Exception as e:
-                return render_template("index.html", step=2, error=str(e))
-                
-    return render_template("index.html", step=1)
+                return render_template("index.html", step=2, error=f"Fallo en ejecución: {str(e)}")
+
+    return render_template("index.html", **context)
 
 @app.route("/download/<filename>/<nombre_descarga>")
 def download(filename, nombre_descarga):
