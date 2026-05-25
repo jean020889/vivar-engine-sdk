@@ -12,10 +12,11 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 panic = "abort"
-strip = true
+# IMPORTANTE: Desactivar strip para que ctypes pueda ver tus funciones exportadas
+strip = false
 
 [dependencies]
-# Dependencias base (mantenidas)
+# Dependencias base
 zeroize = { version = "1.8", features = ["derive"] }
 pqcrypto-kyber = "0.7"
 pqcrypto-traits = "0.3"
