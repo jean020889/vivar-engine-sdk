@@ -19,8 +19,6 @@ lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{e
 if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
 
 lib = ctypes.CDLL(lib_path)
-lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-lib.generate_ciphertext.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.vivar_pqc_process.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
 
 def init_crypto():
@@ -40,9 +38,8 @@ def index():
         return render_template("index.html", step=2, clave=request.form.get("clave"), operacion=request.form.get("operacion"))
     return render_template("index.html", step=1)
 
-@app.route("/ocultar", methods=["GET", "POST"])
+@app.route("/ocultar", methods=["POST"])
 def ocultar():
-    if request.method == "GET": return redirect(url_for('index'))
     if not os.path.exists(SECRET_PATH): init_crypto()
     
     portador = request.files['file_portador'].read()
@@ -53,13 +50,14 @@ def ocultar():
     
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
-    ruta = os.path.join(UPLOAD_FOLDER, secure_filename(request.files['file_portador'].filename))
+    filename = secure_filename(request.files['file_portador'].filename)
+    ruta = os.path.join(UPLOAD_FOLDER, filename)
     with open(ruta, "wb") as f: f.write(portador + SEPARATOR + secreto)
-    return send_file(ruta, as_attachment=True)
+    
+    return send_file(ruta, as_attachment=True, download_name=filename, mimetype="application/octet-stream")
 
-@app.route("/extraer", methods=["GET", "POST"])
+@app.route("/extraer", methods=["POST"])
 def extraer():
-    if request.method == "GET": return redirect(url_for('index'))
     if not os.path.exists(SECRET_PATH): init_crypto()
     
     archivo_cargado = request.files['file_cargado'].read()
@@ -73,9 +71,10 @@ def extraer():
     
     lib.vivar_pqc_process((ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto), ciphertext, 1088, secret_key, 2400)
     
-    ruta_out = os.path.join(UPLOAD_FOLDER, "secreto_recuperado")
+    ruta_out = os.path.join(UPLOAD_FOLDER, "secreto_recuperado.bin")
     with open(ruta_out, "wb") as f: f.write(secreto)
-    return send_file(ruta_out, as_attachment=True)
+    
+    return send_file(ruta_out, as_attachment=True, download_name="secreto_recuperado.bin", mimetype="application/octet-stream")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
