@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17,117 +16,69 @@
         .radio-btn label { background: #f1f5f9; padding: 12px; border-radius: 10px; display: block; cursor: pointer; font-weight: 600; margin: 0; border: 1px solid #e2e8f0; transition: all 0.2s; }
         .radio-btn input:checked + label { background: #0284c7; color: white; border-color: #0284c7; }
         .btn-action { width: 100%; padding: 14px; background-color: #0f172a; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
-        .btn-action:active { background-color: #1e293b; }
-        .btn-download { width: 100%; padding: 16px; background-color: #16a34a; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; display: block; box-sizing: border-box; margin-top: 20px; }
-        .btn-download:active { background-color: #15803d; }
-        .btn-reset { width: 100%; padding: 12px; background-color: #64748b; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; box-sizing: border-box; margin-top: 10px; }
-        .file-box { border: 2px dashed #cbd5e1; padding: 15px; border-radius: 10px; background: #f8fafc; text-align: center; margin-bottom: 15px; cursor: pointer; }
-        .file-box input { display: block; margin: 8px auto 0 auto; font-size: 14px; }
-        .error { background: #fef2f2; color: #b91c1c; padding: 12px; border-radius: 8px; border: 1px solid #fca5a5; font-size: 14px; margin-bottom: 15px; font-weight: 500; }
+        .file-box { border: 2px dashed #cbd5e1; padding: 15px; border-radius: 10px; background: #f8fafc; text-align: center; margin-bottom: 15px; }
+        .file-box input { display: block; margin: 8px auto 0 auto; }
+        .error { background: #fef2f2; color: #b91c1c; padding: 12px; border-radius: 8px; border: 1px solid #fca5a5; font-size: 14px; margin-bottom: 15px; }
         .progress-container { display: none; margin-top: 20px; }
         .progress-bar { width: 100%; background-color: #e2e8f0; border-radius: 10px; overflow: hidden; height: 12px; }
-        .progress-fill { width: 0%; height: 100%; background-color: #0284c7; border-radius: 10px; transition: width 0.4s ease; }
-        .progress-text { text-align: center; font-size: 13px; color: #64748b; margin-top: 6px; font-weight: 500; }
+        .progress-fill { width: 0%; height: 100%; background-color: #0284c7; }
     </style>
-    <script>
-        function iniciarProcesamiento() {
-            document.getElementById("btn-submit-stego").style.display = "none";
-            document.getElementById("progress-area").style.display = "block";
-            let fill = document.getElementById("fill-bar");
-            let txt = document.getElementById("txt-bar");
-            let width = 0;
-            let interval = setInterval(function() {
-                if (width >= 100) {
-                    clearInterval(interval);
-                    txt.innerText = "Finalizando operación limpia...";
-                } else {
-                    width += 10;
-                    fill.style.width = width + "%";
-                    txt.innerText = "Procesando en Core Rust ARX... " + width + "%";
-                }
-            }, 150);
-        }
-    </script>
 </head>
 <body>
 
 <div class="card">
-    <h3>🔏 Vivar Engine Stego SDK</h3>
+    <h3>🔏 Vivar Engine SDK</h3>
 
-    {% if error %}
-        <div class="error">{{ error }}</div>
-    {% endif %}
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
     {% if step == 1 %}
     <form method="POST" action="/">
         <input type="hidden" name="action" value="validar_clave">
-        
-        <label for="clave">Colocar Clave de Seguridad:</label>
-        <input type="password" id="clave" name="clave" placeholder="Ingresa tu clave secreta" required>
-
-        <label>Selecciona Operación:</label>
+        <label>Clave de Seguridad:</label>
+        <input type="password" name="clave" required>
         <div class="radio-box">
-            <div class="radio-btn">
-                <input type="radio" id="cifrar" name="operacion" value="cifrar" checked>
-                <label for="cifrar">🔒 Cifrar / Ocultar</label>
-            </div>
-            <div class="radio-btn">
-                <input type="radio" id="descifrar" name="operacion" value="descifrar">
-                <label for="descifrar">🔓 Extraer / Descifrar</label>
-            </div>
+            <div class="radio-btn"><input type="radio" id="c" name="operacion" value="cifrar" checked><label for="c">🔒 Cifrar</label></div>
+            <div class="radio-btn"><input type="radio" id="d" name="operacion" value="descifrar"><label for="d">🔓 Descifrar</label></div>
         </div>
-
-        <button type="submit" class="btn-action">Ejecutar</button>
+        <button type="submit" class="btn-action">Continuar</button>
     </form>
     {% endif %}
 
     {% if step == 2 %}
-    <form method="POST" action="/" enctype="multipart/form-data" onsubmit="iniciarProcesamiento()">
+    <form method="POST" action="/" enctype="multipart/form-data" onsubmit="document.getElementById('btn').style.display='none'; document.getElementById('prog').style.display='block';">
         <input type="hidden" name="action" value="ejecutar_stego">
         <input type="hidden" name="clave" value="{{ clave }}">
         <input type="hidden" name="operacion" value="{{ operacion }}">
 
-        <p style="font-size: 14px; color: #64748b; margin-top: 0;">Modo activo: <strong>{{ operacion.upper() }}</strong></p>
-
         {% if operacion == "cifrar" %}
         <div class="file-box">
-            <label style="margin:0; color:#1e293b;">📁 Seleccionar archivo a cifrar</label>
+            <label>Archivo Secreto (Payload):</label>
             <input type="file" name="file_secreto" required>
         </div>
         {% endif %}
 
         <div class="file-box">
-            <label style="margin:0; color:#1e293b;">🎬 Seleccionar archivo portador</label>
+            <label>Archivo Portador:</label>
             <input type="file" name="file_portador" required>
         </div>
 
-        <button type="submit" id="btn-submit-stego" class="btn-action">Ejecutar</button>
-
-        <div id="progress-area" class="progress-container">
-            <div class="progress-bar">
-                <div id="fill-bar" class="progress-fill"></div>
-            </div>
-            <div id="txt-bar" class="progress-text">Iniciando algoritmo...</div>
+        <button type="submit" id="btn" class="btn-action">Ejecutar Proceso</button>
+        
+        <div id="prog" class="progress-container">
+            <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
+            <p style="text-align:center; font-size:12px;">Procesando en Core Rust...</p>
         </div>
     </form>
     {% endif %}
 
     {% if step == 3 %}
-    <div style="text-align: center;">
-        <p style="color: #16a34a; font-weight: bold; font-size: 16px; margin-top: 0;">¡Operación Completada con Éxito!</p>
-        <p style="font-size: 14px; color: #475569; margin-bottom: 15px;">El archivo está listo para ser descargado.</p>
-        
-        <a href="/download/{{ archivo_resultante }}/{{ nombre_descarga }}" class="btn-download">
-            📥 Descargar Archivo Real
-        </a>
-
-        <a href="/" class="btn-reset">
-            🔄 Nueva Operación (Limpiar Pantalla)
-        </a>
+    <div style="text-align:center;">
+        <p style="color:#16a34a; font-weight:bold;">¡Operación exitosa!</p>
+        <a href="/download/{{ archivo_resultante }}/{{ nombre_descarga }}" class="btn-action" style="text-decoration:none;">📥 Descargar</a>
+        <a href="/" style="display:block; margin-top:15px; font-size:13px; color:#64748b;">🔄 Reiniciar</a>
     </div>
     {% endif %}
 </div>
 
 </body>
 </html>
-EOF
