@@ -42,6 +42,11 @@ def init_crypto():
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    # CORRECCIÓN: Capturamos los datos del POST para avanzar al step 2
+    if request.method == "POST":
+        clave = request.form.get("clave")
+        operacion = request.form.get("operacion")
+        return render_template("index.html", step=2, clave=clave, operacion=operacion)
     return render_template("index.html", step=1)
 
 @app.route("/ocultar", methods=["POST"])
@@ -54,7 +59,6 @@ def ocultar():
     data_portador = portador_file.read()
     secreto = bytearray(secreto_file.read())
     
-    # Cifrado
     with open(VAULT_PATH, "rb") as f: vault = PqcVault.from_buffer_copy(f.read())
     lib.vivar_pqc_process(
         (ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto),
@@ -62,7 +66,7 @@ def ocultar():
         vault.encrypted_payload, 2400
     )
     
-    # Codificación Base64 para integridad binaria
+    # Codificación Base64 para integridad
     secreto_b64 = base64.b64encode(secreto)
     
     ruta = os.path.join(UPLOAD_FOLDER, "stego_" + secure_filename(portador_file.filename))
@@ -75,11 +79,15 @@ def ocultar():
 
 @app.route("/extraer", methods=["POST"])
 def extraer():
+    # CORRECCIÓN: Validación de archivo cargado
+    if 'file_cargado' not in request.files: return "No hay archivo", 400
+    
     archivo_cargado = request.files['file_cargado'].read()
+    if SEPARATOR not in archivo_cargado: return "Archivo no válido o corrupto", 400
+    
     partes = archivo_cargado.split(SEPARATOR, 1)
     meta, secreto_b64 = partes[1].split(META_SEPARATOR, 1)
     
-    # Decodificación Base64
     secreto = bytearray(base64.b64decode(secreto_b64))
     
     with open(VAULT_PATH, "rb") as f: vault = PqcVault.from_buffer_copy(f.read())
