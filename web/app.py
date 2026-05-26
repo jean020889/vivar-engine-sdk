@@ -2,6 +2,7 @@ import os
 import ctypes
 import platform
 import base64
+import sys
 from flask import Flask, render_template, request, send_file, make_response
 from werkzeug.utils import secure_filename
 
@@ -18,19 +19,25 @@ class PqcVault(ctypes.Structure):
     _fields_ = [("ciphertext", ctypes.c_char * 1088),
                 ("encrypted_payload", ctypes.c_char * 2400)]
 
-# Carga de librería
-ext = ".so" if platform.system() != "Windows" else ".dll"
-lib_path = os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{ext}")
-if not os.path.exists(lib_path): lib_path = os.path.join(BASE_DIR, f"libvivar_engine{ext}")
+# --- CARGA SEGURA DE LIBRERÍA ---
+ext = ".so"
+# Ajustamos la ruta para que sea absoluta y confiable en Termux
+lib_path = os.path.abspath(os.path.join(BASE_DIR, '..', 'target', 'release', f"libvivar_engine{ext}"))
 
-lib = ctypes.CDLL(lib_path)
-lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-lib.seal_secret.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(PqcVault)]
-lib.vivar_pqc_process.argtypes = [
-    ctypes.POINTER(ctypes.c_char), ctypes.c_size_t, 
-    ctypes.POINTER(ctypes.c_char), ctypes.c_size_t, 
-    ctypes.POINTER(ctypes.c_char), ctypes.c_size_t
-]
+try:
+    lib = ctypes.CDLL(lib_path)
+    lib.generate_keys.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    lib.seal_secret.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(PqcVault)]
+    lib.vivar_pqc_process.argtypes = [
+        ctypes.POINTER(ctypes.c_char), ctypes.c_size_t, 
+        ctypes.POINTER(ctypes.c_char), ctypes.c_size_t, 
+        ctypes.POINTER(ctypes.c_char), ctypes.c_size_t
+    ]
+    print(f"Librería cargada desde: {lib_path}")
+except Exception as e:
+    print(f"ERROR FATAL: No se pudo cargar la librería en {lib_path}")
+    print(f"Detalle: {e}")
+    sys.exit(1) # Detenemos el script con un mensaje claro
 
 def init_crypto():
     pk = ctypes.create_string_buffer(1184)
@@ -53,12 +60,10 @@ def ocultar():
     portador_file = request.files['file_portador']
     secreto_file = request.files['file_secreto']
     
-    # Lectura segura
     data_portador = portador_file.read()
     secreto = bytearray(secreto_file.read())
     
     with open(VAULT_PATH, "rb") as f: vault = PqcVault.from_buffer_copy(f.read())
-    
     lib.vivar_pqc_process(
         (ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto),
         vault.ciphertext, 1088,
@@ -67,7 +72,6 @@ def ocultar():
     
     secreto_b64 = base64.b64encode(secreto)
     
-    # Escritura por bloques para evitar corrupción
     ruta = os.path.join(UPLOAD_FOLDER, "stego_" + secure_filename(portador_file.filename))
     with open(ruta, "wb") as f: 
         f.write(data_portador)
@@ -83,8 +87,7 @@ def ocultar():
 @app.route("/extraer", methods=["POST"])
 def extraer():
     archivo_cargado = request.files['file_cargado'].read()
-    # Buscamos el separador de forma segura
-    if SEPARATOR not in archivo_cargado: return "Error: Archivo no contiene datos protegidos", 400
+    if SEPARATOR not in archivo_cargado: return "Error: Archivo no válido", 400
     
     partes = archivo_cargado.split(SEPARATOR, 1)
     meta_info, secreto_b64 = partes[1].split(META_SEPARATOR, 1)
@@ -92,7 +95,6 @@ def extraer():
     secreto = bytearray(base64.b64decode(secreto_b64))
     
     with open(VAULT_PATH, "rb") as f: vault = PqcVault.from_buffer_copy(f.read())
-    
     lib.vivar_pqc_process(
         (ctypes.c_char * len(secreto)).from_buffer(secreto), len(secreto),
         vault.ciphertext, 1088,
@@ -105,3 +107,7 @@ def extraer():
     response = make_response(send_file(ruta_out, as_attachment=True))
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
+    
